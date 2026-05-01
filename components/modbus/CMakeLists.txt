@@ -10,6 +10,7 @@ add_library(modbus-server
   src/ModbusTcpServer.cpp
   include/ModbusServer.hpp
   src/ModbusTcpServer.hpp
+  tests/.gitkeep
 )
 
 target_include_directories(modbus-server
