@@ -3,13 +3,10 @@
 #include <QDebug>
 
 namespace emulator::modbus {
-
-RegisterBank tempRegBank;
-
-ModbusServer::ModbusServer(RegisterBank* regBank, QObject* parent)
+ModbusServer::ModbusServer(emulator::registerbank::RegisterBank* regBank, QObject* parent)
     : QObject(parent)
 {
-    m_server = new ModbusTcpServer(&tempRegBank, this);
+    m_server = new ModbusTcpServer(regBank, this);
 
     connect(m_server, &QModbusServer::errorOccurred,
             this, [](QModbusDevice::Error error) {

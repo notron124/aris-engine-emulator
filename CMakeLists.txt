@@ -3,19 +3,24 @@ project(stand-emulator LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
 
-find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core Network SerialBus)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Network SerialBus)
+find_package(QT NAMES Qt6)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Network SerialBus Test)
+qt_standard_project_setup()
 
 # Компоненты в порядке зависимостей
-# add_subdirectory(components/register_bank)
+option(BUILD_TESTING "Build tests" ON)
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests/unit/)
+endif()
+
+add_subdirectory(components/registerbank)
 add_subdirectory(components/modbus)
 
 add_executable(aris-engine
     src/core/main.cpp
+    components/registerbank/include/RegisterBank.hpp
 )
 
 target_link_libraries(aris-engine
@@ -23,6 +28,7 @@ target_link_libraries(aris-engine
         Qt${QT_VERSION_MAJOR}::Core
         Qt${QT_VERSION_MAJOR}::Network
         Qt${QT_VERSION_MAJOR}::SerialBus
+        register-bank
         modbus-server
-        #register-bank
 )
+

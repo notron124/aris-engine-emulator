@@ -4,7 +4,7 @@
 
 namespace emulator::modbus {
 
-ModbusTcpServer::ModbusTcpServer(RegisterBank* regBank,
+ModbusTcpServer::ModbusTcpServer(emulator::registerbank::RegisterBank* regBank,
                                  QObject* parent)
     : QModbusTcpServer(parent)
     , registerBank_(regBank)
@@ -18,56 +18,87 @@ ModbusTcpServer::ModbusTcpServer(RegisterBank* regBank,
     setServerAddress(1);
 }
 
-bool ModbusTcpServer::readData(QModbusDataUnit *data) const {
-    // const QModbusDataUnit::RegisterType regType = data->registerType();
-    // const qsizetype valueCount = data->valueCount();
+bool ModbusTcpServer::readData(QModbusDataUnit* data) const {
+    const QModbusDataUnit::RegisterType regType = data->registerType();
+    const qsizetype valueCount = data->valueCount();
+    const qsizetype startAddr = data->startAddress();
 
-    // switch (regType) {
-    // case QModbusDataUnit::Coils: {
-    //     auto bits = registerBank_->readCoils(data->startAddress(), valueCount);
-    //     for (qsizetype i = 0; i < bits.size(); ++i) {
-    //         data->setValue(i, bits[i]);
-    //     }
-    //     return true;
-    // }
+    switch (regType) {
+    case QModbusDataUnit::Coils: {
+        auto bits = registerBank_->readCoils(startAddr, valueCount);
+        for (qsizetype i = 0; i < bits.size(); ++i) {
+            data->setValue(i, bits[i] ? 1 : 0);
+        }
+        return true;
+    }
 
-    // case QModbusDataUnit::DiscreteInputs: {
-    //     auto bits = registerBank_->readDiscreteInputs(data->startAddress(), valueCount);
-    //     for (qsizetype i = 0; i < bits.size(); ++i) {
-    //         data->setValue(i, bits[i]);
-    //     }
-    //     return true;
-    // }
+    case QModbusDataUnit::DiscreteInputs: {
+        auto bits = registerBank_->readDiscreteInputs(startAddr, valueCount);
+        for (qsizetype i = 0; i < bits.size(); ++i) {
+            data->setValue(i, bits[i] ? 1 : 0);
+        }
+        return true;
+    }
 
-    // case QModbusDataUnit::InputRegisters: {
-    //     auto bits = registerBank_->readInputRegisters(data->startAddress(), valueCount);
-    //     for (qsizetype i = 0; i < bits.size(); ++i) {
-    //         data->setValue(i, bits[i]);
-    //     }
-    //     return true;
-    // }
+    case QModbusDataUnit::InputRegisters: {
+        auto bits = registerBank_->readInputRegisters(startAddr, valueCount);
+        for (qsizetype i = 0; i < bits.size(); ++i) {
+            data->setValue(i, bits[i]);
+        }
+        return true;
+    }
 
-    // case QModbusDataUnit::HoldingRegisters: {
-    //     auto bits = registerBank_->readHoldingRegisters(data->startAddress(), valueCount);
-    //     for (qsizetype i = 0; i < bits.size(); ++i) {
-    //         data->setValue(i, bits[i]);
-    //     }
-    //     return true;
-    // }
+    case QModbusDataUnit::HoldingRegisters: {
+        auto bits = registerBank_->readHoldingRegisters(startAddr, valueCount);
+        for (qsizetype i = 0; i < bits.size(); ++i) {
+            data->setValue(i, bits[i]);
+        }
+        return true;
+    }
 
-    // case QModbusDataUnit::Invalid: {
-    //     qWarning("Invalid register type read requested");
-    //     return false;
-    // }
+    case QModbusDataUnit::Invalid: {
+        qWarning("Invalid register type read requested");
+        return false;
+    }
 
-    // default:
-    //     return false;
-    // }
+    default:
+        return false;
+    }
 
     return QModbusTcpServer::readData(data);
 }
 
-bool ModbusTcpServer::writeData(const QModbusDataUnit &data) {
+bool ModbusTcpServer::writeData(const QModbusDataUnit& data) {
+    const QModbusDataUnit::RegisterType regType = data.registerType();
+    const qsizetype startAddr = data.startAddress();
+    const QList<uint16_t> payload = data.values();
+
+    switch (regType) {
+    case QModbusDataUnit::Coils: {
+        QList<bool> coils;
+        coils.reserve(data.valueCount());
+        std::transform(payload.begin(), payload.end(), std::back_inserter(coils),
+                       [](uint16_t value) {
+                           return static_cast<bool>(value);
+                       });
+        registerBank_->writeCoils(startAddr, coils);
+        return true;
+    }
+
+    case QModbusDataUnit::HoldingRegisters: {
+        registerBank_->writeHoldingRegisters(startAddr, payload);
+        return true;
+    }
+
+    case QModbusDataUnit::Invalid: {
+        qWarning("Invalid register type read requested");
+        return false;
+    }
+
+    default:
+        return false;
+    }
+
     return QModbusTcpServer::writeData(data);
 }
 

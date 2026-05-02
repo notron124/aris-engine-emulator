@@ -2,14 +2,17 @@
 #include <QModbusTcpClient>
 #include <QTimer>
 #include <QDebug>
-#include <qvariant.h>
+#include <QVariant>
+#include "RegisterBank.hpp"
 #include "ModbusServer.hpp"
 
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
-    emulator::modbus::ModbusServer server(nullptr, &a);
+    emulator::registerbank::RegisterBank regBank;
+
+    emulator::modbus::ModbusServer server(&regBank, &a);
     server.start("127.0.0.1", 502);
 
     QModbusTcpClient *client = new QModbusTcpClient(&a);

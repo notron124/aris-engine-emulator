@@ -5,29 +5,28 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(modbus-server
-  src/ModbusServer.cpp
-  src/ModbusTcpServer.cpp
-  include/ModbusServer.hpp
-  src/ModbusTcpServer.hpp
+add_library(register-bank
+  # src/ModbusServer.cpp
+  # src/ModbusTcpServer.cpp
+  include/RegisterBank.hpp
+  # src/ModbusTcpServer.hpp
 )
 
-target_include_directories(modbus-server
+target_include_directories(register-bank
   PUBLIC
       ${CMAKE_CURRENT_SOURCE_DIR}/include
   PRIVATE
       ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(modbus-server
+target_link_libraries(register-bank
   PUBLIC
-      register-bank
       Qt${QT_VERSION_MAJOR}::Core
-      Qt${QT_VERSION_MAJOR}::Network
+      # Qt${QT_VERSION_MAJOR}::Network
   PRIVATE
-      Qt${QT_VERSION_MAJOR}::SerialBus
+      # Qt${QT_VERSION_MAJOR}::SerialBus
 )
 
-if(BUILD_TESTING)
+if(BUILD_TESTS)
     add_subdirectory(tests)
 endif()
