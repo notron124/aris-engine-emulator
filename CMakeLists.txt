@@ -1,28 +1,30 @@
 cmake_minimum_required(VERSION 3.16)
-project(stand-emulator LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
 
-find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core Network SerialBus)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Network SerialBus)
+project(stand-emulator
+    LANGUAGES CXX
+)
 
-# Компоненты в порядке зависимостей
-# add_subdirectory(components/register_bank)
+# ==============================================================================
+
+find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core Network SerialPort SerialBus)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Network SerialPort SerialBus)
+qt_standard_project_setup()
+
 add_subdirectory(components/modbus)
 
 add_executable(aris-engine
-    src/core/main.cpp
+    main.cpp
 )
 
 target_link_libraries(aris-engine
     PRIVATE
-        Qt${QT_VERSION_MAJOR}::Core
-        Qt${QT_VERSION_MAJOR}::Network
-        Qt${QT_VERSION_MAJOR}::SerialBus
         modbus-server
-        #register-bank
 )
+
+# ==============================================================================
+
+option(BUILD_TESTING "Build tests" OFF)
+include(CTest)
