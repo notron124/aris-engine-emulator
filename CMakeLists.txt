@@ -14,6 +14,7 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Network SerialPort S
 qt_standard_project_setup()
 
 add_subdirectory(components/modbus)
+add_subdirectory(components/registerbank)
 
 add_executable(aris-engine
     main.cpp
@@ -21,6 +22,7 @@ add_executable(aris-engine
 
 target_link_libraries(aris-engine
     PRIVATE
+        register-bank
         modbus-server
 )
 

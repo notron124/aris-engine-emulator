@@ -13,13 +13,12 @@ target_include_directories(modbus-server
 )
 
 target_link_libraries(modbus-server
-  PUBLIC
-    # RegisterBank
-    Qt${QT_VERSION_MAJOR}::Core
-    Qt${QT_VERSION_MAJOR}::Network
-    Qt${QT_VERSION_MAJOR}::SerialBus
+      register-bank
+      Qt${QT_VERSION_MAJOR}::Core
+      Qt${QT_VERSION_MAJOR}::Network
+      Qt${QT_VERSION_MAJOR}::SerialBus
 )
 
 if(BUILD_TESTING)
-  add_subdirectory(tests)
+    add_subdirectory(tests)
 endif()

@@ -3,21 +3,16 @@
 
 #include <QObject>
 #include <QHostAddress>
-//#include <memory>
-//#include "RegisterBank/RegisterBank.hpp"
-
+#include "RegisterBank.hpp"
 
 namespace emulator::modbus {
 
-class RegisterBank;
-
 class ModbusTcpServer;
-
 
 class ModbusServer : public QObject {
     Q_OBJECT
 public:
-    explicit ModbusServer(RegisterBank* regBank,
+    explicit ModbusServer(emulator::registerbank::RegisterBank* regBank,
                           QObject* parent = nullptr);
     ~ModbusServer() override;
 
