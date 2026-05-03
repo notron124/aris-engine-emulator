@@ -7,6 +7,9 @@ project(stand-emulator
     LANGUAGES CXX
 )
 
+option(BUILD_TESTING "Build tests" OFF)
+include(CTest)
+
 # ==============================================================================
 
 find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core Network SerialPort SerialBus)
@@ -27,6 +30,3 @@ target_link_libraries(aris-engine
 )
 
 # ==============================================================================
-
-option(BUILD_TESTING "Build tests" OFF)
-include(CTest)
