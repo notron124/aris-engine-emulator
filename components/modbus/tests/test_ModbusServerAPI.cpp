@@ -12,13 +12,11 @@ private slots:
         server = new emulator::modbus::ModbusServer(bank);
         server->start("127.0.0.1", 1502);
 
-
         client = new QModbusTcpClient();
         client->setConnectionParameter(QModbusDevice::NetworkAddressParameter, "127.0.0.1");
         client->setConnectionParameter(QModbusDevice::NetworkPortParameter, 1502);
         QVERIFY(client->connectDevice());
 
-        // Ждем соединения клиента
         QSignalSpy spy(client, &QModbusClient::stateChanged);
         if (client->state() != QModbusDevice::ConnectedState)
             QVERIFY(spy.wait(1000));
@@ -115,4 +113,4 @@ private:
 };
 
 QTEST_MAIN(ModbusFullTest)
-#include "ModbusServer_tests.moc"
+#include "test_ModbusServerAPI.moc"
