@@ -415,7 +415,42 @@ void RegisterBankSimulationExchange::publishModelOutputSnapshot(
 
 #### Структура данных
 
-> TODO Можно добавить и структуру состояний и диаграмму состояний. Тогда надо поправить Цикл работы, добавив упоминание контроля состояния.
+Диаграмма классов (упрощённая):
+
+```mermaid
+classDiagram
+    direction LR
+
+    class SimulationController
+    class SimulationRunner {
+        <<interface>>
+    }
+    class SimulationRunnerBase {
+        <<abstract>>
+    }
+    class StepOnDemandSimulationRunner
+    class ContinuousSimulationRunner
+    class ModelAdapter {
+        <<interface>>
+    }
+    class SimulationBackendBridge
+    class SimulationSnapshotExchange {
+        <<interface>>
+    }
+
+    SimulationController *-- SimulationRunner : owns
+    SimulationRunner <|-- SimulationRunnerBase
+    SimulationRunnerBase <|-- StepOnDemandSimulationRunner
+    SimulationRunnerBase <|-- ContinuousSimulationRunner
+
+    SimulationRunnerBase --> ModelAdapter : uses
+
+    SimulationBackendBridge --> SimulationController : calls processSnapshot()
+    SimulationBackendBridge --> SimulationSnapshotExchange : reads/publishes snapshots
+
+    ContinuousSimulationRunner --> ContinuousSimulationRunner : worker thread
+
+```
 
 ### 6.4 ModelAdapter и будущий FmiModelAdapter
 
