@@ -12,7 +12,7 @@ SimulationRunnerBase::SimulationRunnerBase(
     SimulationConfig config)
     : controller_(controller)
     , modelAdapter_(modelAdapter)
-    , config_(config)
+    , config_(std::move(config))
 {
 }
 

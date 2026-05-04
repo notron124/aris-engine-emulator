@@ -31,14 +31,14 @@ createRunner(
         return std::make_unique<detail::StepOnDemandSimulationRunner>(
             controller,
             modelAdapter,
-            config,
+            std::move(config),
             std::move(clock));
 
     case SimulationRunMode::Continuous:
         return std::make_unique<detail::ContinuousSimulationRunner>(
             controller,
             modelAdapter,
-            config);
+            std::move(config));
     }
 
     return nullptr;
