@@ -101,13 +101,27 @@ protected:
     /**
      * @brief Проверяет выходы модели на превышение лимитов симуляции.
      *
-     * Возвращает диагностику модели, если ModelAdapter::diagnostics() уже
-     * содержит fault. Иначе собирает все нарушения лимитов в один
-     * DiagnosticsSnapshot.
+     * Возвращает доменную runtime-диагностику без изменения состояния
+     * симуляции.
      */
-    [[nodiscard]] DiagnosticsSnapshot diagnosticsForOutputs(
+    [[nodiscard]] RuntimeDiagnostics runtimeDiagnosticsForOutputs(
         const ModelOutputs& outputs,
         const SimulationLimits& limits) const;
+
+    /**
+     * @brief Формирует fault-диагностику из нарушений лимитов.
+     *
+     * Используется только если SimulationConfig::limitViolationAction требует
+     * остановки симуляции.
+     */
+    [[nodiscard]] DiagnosticsSnapshot limitViolationFaultDiagnostics(
+        const RuntimeDiagnostics& runtimeDiagnostics) const;
+
+    /**
+     * @brief Проверяет, нужно ли остановить симуляцию по нарушениям лимитов.
+     */
+    [[nodiscard]] bool shouldStopOnLimitViolation(
+        const RuntimeDiagnostics& runtimeDiagnostics) const;
 
     /**
      * @brief Формирует снимок текущего состояния без продвижения модельного
@@ -120,12 +134,13 @@ protected:
      * @brief Создаёт ModelOutputSnapshot с новой ревизией.
      *
      * Метод не сохраняет снимок как последний. Для этого вызывается
-     * `recordSnapshot(...)`.
+     * recordSnapshot(...).
      */
     [[nodiscard]] ModelOutputSnapshot makeOutputSnapshot(
         std::uint64_t sourceInputRevision,
         std::optional<ModelOutputs> outputs,
-        const DiagnosticsSnapshot& diagnostics);
+        const DiagnosticsSnapshot& diagnostics,
+        RuntimeDiagnostics runtimeDiagnostics = {});
 
     /**
      * @brief Лениво инициализирует ModelAdapter.
@@ -190,6 +205,7 @@ protected:
     ModelInputs currentInputs_;
     std::optional<ModelOutputs> lastModelOutputs_;
     DiagnosticsSnapshot lastFaultDiagnostics_;
+    RuntimeDiagnostics lastRuntimeDiagnostics_;
     std::optional<ModelOutputSnapshot> lastProducedSnapshot_;
 };
 

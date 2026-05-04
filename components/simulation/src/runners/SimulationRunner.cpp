@@ -43,14 +43,18 @@ SimulationRunnerBase::readCurrentState(const ClientInputSnapshot& inputSnapshot)
         ? lastFaultDiagnostics_
         : (adapterInitialized_ ? modelAdapter_.diagnostics() : DiagnosticsSnapshot{});
 
-    return makeOutputSnapshot(inputSnapshot.revision, lastModelOutputs_, diagnostics);
+    return makeOutputSnapshot(inputSnapshot.revision,
+                              lastModelOutputs_,
+                              diagnostics,
+                              lastRuntimeDiagnostics_);
 }
 
 ModelOutputSnapshot
 SimulationRunnerBase::makeOutputSnapshot(
     std::uint64_t sourceInputRevision,
     std::optional<ModelOutputs> outputs,
-    const DiagnosticsSnapshot& diagnostics)
+    const DiagnosticsSnapshot& diagnostics,
+    RuntimeDiagnostics runtimeDiagnostics)
 {
     ModelOutputSnapshot snapshot;
     snapshot.revision = ++outputRevision_;
@@ -58,6 +62,7 @@ SimulationRunnerBase::makeOutputSnapshot(
     snapshot.state = state_;
     snapshot.outputs = std::move(outputs);
     snapshot.diagnostics = diagnostics;
+    snapshot.runtimeDiagnostics = std::move(runtimeDiagnostics);
     snapshot.modelTime = modelTime_;
     snapshot.timestampUtc = QDateTime::currentDateTimeUtc();
     return snapshot;
@@ -77,28 +82,27 @@ SimulationRunnerBase::failureDiagnostics(
     return diagnostics;
 }
 
-DiagnosticsSnapshot
-SimulationRunnerBase::diagnosticsForOutputs(
+RuntimeDiagnostics
+SimulationRunnerBase::runtimeDiagnosticsForOutputs(
     const ModelOutputs& outputs,
     const SimulationLimits& limits) const
 {
-    auto diagnostics = modelAdapter_.diagnostics();
-    if (diagnostics.hasFault) {
-        return diagnostics;
-    }
-
-    QStringList violations;
-    const auto appendViolation = [&violations](
+    RuntimeDiagnostics diagnostics;
+    const auto appendViolation = [&diagnostics](
                                      const QString& name,
                                      double value,
                                      const QString& relation,
                                      double limit) {
-        violations.push_back(QStringLiteral("%1=%2 %3 %4")
-                                 .arg(name)
-                                 .arg(value)
-                                 .arg(relation)
-                                 .arg(limit));
+        diagnostics.limitViolations.push_back(LimitViolation {
+            name,
+            value,
+            relation,
+            limit
+        });
     };
+
+    /// @todo Архитектурно негибкая логика:
+    /// у модели могжет поменяться состав контролируемых параметров
 
     if (outputs.T_cool > limits.T_cool_max) {
         appendViolation(QStringLiteral("T_cool"),
@@ -143,16 +147,39 @@ SimulationRunnerBase::diagnosticsForOutputs(
                         limits.T_ballast_max);
     }
 
-    if (!violations.empty()) {
-        DiagnosticsSnapshot result;
-        result.hasFault = true;
-        result.faultCode = limitFaultCode;
-        result.message = QStringLiteral("Simulation limits exceeded: %1")
-                             .arg(violations.join(QStringLiteral("; ")));
-        return result;
+    return diagnostics;
+}
+
+DiagnosticsSnapshot
+SimulationRunnerBase::limitViolationFaultDiagnostics(
+    const RuntimeDiagnostics& runtimeDiagnostics) const
+{
+    DiagnosticsSnapshot diagnostics;
+    if (!runtimeDiagnostics.hasLimitViolations()) {
+        return diagnostics;
     }
 
+    QStringList violations;
+    for (const auto& violation : runtimeDiagnostics.limitViolations) {
+        violations.push_back(QStringLiteral("%1=%2 %3 %4")
+                                 .arg(violation.parameter)
+                                 .arg(violation.value)
+                                 .arg(violation.relation)
+                                 .arg(violation.limit));
+    }
+
+    diagnostics.faultCode = SimulationFaultCode::SimulationLimitsExceeded;
+    diagnostics.message = QStringLiteral("Simulation limits exceeded: %1")
+                              .arg(violations.join(QStringLiteral("; ")));
     return diagnostics;
+}
+
+bool
+SimulationRunnerBase::shouldStopOnLimitViolation(
+    const RuntimeDiagnostics& runtimeDiagnostics) const
+{
+    return config_.limitViolationAction == LimitViolationAction::StopSimulation
+        && runtimeDiagnostics.hasLimitViolations();
 }
 
 bool SimulationRunnerBase::ensureInitialized()
@@ -182,6 +209,7 @@ bool SimulationRunnerBase::resetModel()
     hasLastFaultDiagnostics_ = false;
     currentInputs_ = ModelInputs{};
     lastModelOutputs_.reset();
+    lastRuntimeDiagnostics_ = RuntimeDiagnostics{};
     lastProducedSnapshot_.reset();
     modelTime_ = std::chrono::milliseconds{0};
     setState(SimulationState::Stopped);
@@ -201,6 +229,7 @@ void SimulationRunnerBase::rememberInputs(const ClientInputSnapshot& inputSnapsh
 void SimulationRunnerBase::recordSnapshot(const ModelOutputSnapshot& snapshot)
 {
     lastProducedSnapshot_ = snapshot;
+    lastRuntimeDiagnostics_ = snapshot.runtimeDiagnostics;
     if (snapshot.outputs.has_value()) {
         lastModelOutputs_ = snapshot.outputs;
     }

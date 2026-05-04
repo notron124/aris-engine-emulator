@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 namespace emulator::simulation {
 
@@ -96,9 +97,25 @@ enum class SimulationRunMode : std::uint8_t {
     Continuous
 };
 
+/**
+ * @brief Политика реакции на выход контролируемых параметров за лимиты.
+ */
+enum class LimitViolationAction : std::uint8_t {
+    /**
+     * @brief Только публиковать runtime-диагностику и продолжать расчёт.
+     */
+    ReportOnly,
+
+    /**
+     * @brief Переводить симуляцию в Fault при нарушении лимитов.
+     */
+    StopSimulation
+};
+
 struct SimulationConfig {
     SimulationRunMode runMode;
     std::chrono::milliseconds integrationStep; ///< dt модели
+    LimitViolationAction limitViolationAction = LimitViolationAction::ReportOnly;
 };
 
 /**
@@ -250,12 +267,29 @@ struct DiagnosticsSnapshot {
     }
 };
 
+struct LimitViolation {
+    QString parameter;  ///< Имя контролируемого параметра
+    double value = 0.0; ///< Значение контролируемого параметра
+    QString relation;   ///< Отношение контролируемого параметра к лимиту
+    double limit = 0.0; ///< Значение лимита контролируемого параметра
+};
+
+struct RuntimeDiagnostics {
+    std::vector<LimitViolation> limitViolations;
+
+    [[nodiscard]] bool hasLimitViolations() const
+    {
+        return !limitViolations.empty();
+    }
+};
+
 struct ModelOutputSnapshot {
     std::uint64_t revision      = 0;
     std::uint64_t sourceInputRevision = 0;
     SimulationState state       = SimulationState::Stopped;
     std::optional<ModelOutputs> outputs;
     DiagnosticsSnapshot diagnostics;
+    RuntimeDiagnostics runtimeDiagnostics;
     std::chrono::milliseconds modelTime{0};
     QDateTime timestampUtc;
 };
