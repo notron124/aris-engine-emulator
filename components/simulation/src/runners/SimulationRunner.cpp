@@ -36,6 +36,70 @@ std::optional<ModelOutputSnapshot> SimulationRunnerBase::lastOutputSnapshot() co
     return lastProducedSnapshot_;
 }
 
+std::chrono::milliseconds
+SimulationRunnerBase::normalizedIntegrationStep() const
+{
+    if (config_.integrationStep > std::chrono::milliseconds::zero()) {
+        return config_.integrationStep;
+    }
+
+    return std::chrono::milliseconds{1};
+}
+
+std::optional<ModelOutputSnapshot>
+SimulationRunnerBase::startModel(const ClientInputSnapshot& inputSnapshot)
+{
+    if (state_ == SimulationState::Fault) {
+        const auto diagnostics = hasLastFaultDiagnostics_
+            ? lastFaultDiagnostics_
+            : failureDiagnostics(QStringLiteral("Simulation is in fault state"));
+        return makeOutputSnapshot(inputSnapshot.revision, lastModelOutputs_, diagnostics);
+    }
+
+    if (!ensureInitialized()) {
+        const auto diagnostics = hasLastFaultDiagnostics_
+            ? lastFaultDiagnostics_
+            : failureDiagnostics(QStringLiteral("Model adapter initialization failed"));
+        return makeOutputSnapshot(inputSnapshot.revision, lastModelOutputs_, diagnostics);
+    }
+
+    setState(SimulationState::Running);
+    return makeOutputSnapshot(inputSnapshot.revision,
+                              std::nullopt,
+                              modelAdapter_.diagnostics());
+}
+
+std::optional<ModelOutputSnapshot>
+SimulationRunnerBase::stopModel(const ClientInputSnapshot& inputSnapshot)
+{
+    setState(SimulationState::Stopped);
+    return readCurrentState(inputSnapshot);
+}
+
+std::optional<ModelOutputSnapshot>
+SimulationRunnerBase::resetModelAndMakeSnapshot(
+    const ClientInputSnapshot& inputSnapshot)
+{
+    if (!resetModel()) {
+        const auto diagnostics = hasLastFaultDiagnostics_
+            ? lastFaultDiagnostics_
+            : failureDiagnostics(QStringLiteral("Model adapter reset failed"));
+        return makeOutputSnapshot(inputSnapshot.revision, lastModelOutputs_, diagnostics);
+    }
+
+    return makeOutputSnapshot(inputSnapshot.revision, std::nullopt, DiagnosticsSnapshot{});
+}
+
+std::optional<ModelOutputSnapshot>
+SimulationRunnerBase::emergencyStop(const ClientInputSnapshot& inputSnapshot)
+{
+    DiagnosticsSnapshot diagnostics;
+    diagnostics.faultCode = SimulationFaultCode::EmergencyStop;
+    diagnostics.message = QStringLiteral("Emergency stop requested");
+    enterFault(diagnostics);
+    return makeOutputSnapshot(inputSnapshot.revision, lastModelOutputs_, diagnostics);
+}
+
 std::optional<ModelOutputSnapshot>
 SimulationRunnerBase::readCurrentState(const ClientInputSnapshot& inputSnapshot)
 {

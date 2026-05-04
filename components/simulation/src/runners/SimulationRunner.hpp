@@ -90,6 +90,42 @@ public:
 
 protected:
     /**
+     * @brief Возвращает положительный внутренний шаг расчёта.
+     *
+     * Если в конфигурации задан неположительный/нулевой integrationStep,
+     * используется безопасное значение 1 мс.
+     */
+    [[nodiscard]] std::chrono::milliseconds normalizedIntegrationStep() const;
+
+    /**
+     * @brief Обрабатывает общую часть команды SimulationCommand::Start.
+     *
+     * Инициализирует модель, переводит стратегию в Running и формирует
+     * снимок состояния. Специфичные действия стратегии, например запуск
+     * worker-потока или отметка времени, выполняются в наследнике.
+     */
+    [[nodiscard]] std::optional<ModelOutputSnapshot> startModel(
+        const ClientInputSnapshot& inputSnapshot);
+
+    /**
+     * @brief Обрабатывает общую часть команды SimulationCommand::Stop.
+     */
+    [[nodiscard]] std::optional<ModelOutputSnapshot> stopModel(
+        const ClientInputSnapshot& inputSnapshot);
+
+    /**
+     * @brief Обрабатывает общую часть команды SimulationCommand::Reset.
+     */
+    [[nodiscard]] std::optional<ModelOutputSnapshot> resetModelAndMakeSnapshot(
+        const ClientInputSnapshot& inputSnapshot);
+
+    /**
+     * @brief Обрабатывает общую часть команды SimulationCommand::EmergencyStop.
+     */
+    [[nodiscard]] std::optional<ModelOutputSnapshot> emergencyStop(
+        const ClientInputSnapshot& inputSnapshot);
+
+    /**
      * @brief Формирует fault-диагностику для внутренних ошибок runner/model API.
      *
      * Если модель уже вернула собственную fault-диагностику, она сохраняется.
