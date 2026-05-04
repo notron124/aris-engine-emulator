@@ -10,16 +10,12 @@ namespace emulator::simulation {
 
 namespace {
 
-constexpr int UnsupportedRunModeFaultCode = 666;
-
 DiagnosticsSnapshot
 unsupportedRunModeDiagnostics()
 {
-    DiagnosticsSnapshot diagnostics {
-        .hasFault = true,
-        .faultCode = UnsupportedRunModeFaultCode,
-        .message = QStringLiteral("Unsupported simulation run mode")
-    };
+    DiagnosticsSnapshot diagnostics;
+    diagnostics.faultCode = SimulationFaultCode::UnsupportedRunMode;
+    diagnostics.message = QStringLiteral("Unsupported simulation run mode");
     return diagnostics;
 }
 
@@ -70,6 +66,7 @@ SimulationController::SimulationController(
     , runner_(createRunner(*this, modelAdapter, std::move(config), std::move(clock)))
 {
     qRegisterMetaType<SimulationState>("emulator::simulation::SimulationState");
+    qRegisterMetaType<SimulationFaultCode>("emulator::simulation::SimulationFaultCode");
     qRegisterMetaType<DiagnosticsSnapshot>("emulator::simulation::DiagnosticsSnapshot");
 }
 

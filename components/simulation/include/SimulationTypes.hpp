@@ -188,10 +188,66 @@ struct ClientInputSnapshot {
     std::optional<ModelInputs> inputs;
 };
 
+/**
+ * @brief Код диагностической ошибки слоя simulation.
+ *
+ * Значения фиксируют причину перехода в fault-состояние.
+ */
+enum class SimulationFaultCode : int {
+    /**
+     * @brief Ошибки нет.
+     *
+     * Используется в DiagnosticsSnapshot по умолчанию и для снимков без fault.
+     */
+    None = 0,
+
+    /**
+     * @brief Внутренняя ошибка оркестрации simulation.
+     *
+     * Например, ModelAdapter не инициализировался, отказался принять входы или
+     * вернул ошибку при шаге расчёта без собственной диагностики.
+     */
+    InternalError = -1,
+
+    /**
+     * @brief Аварийная остановка по команде backend.
+     *
+     * Возникает при SimulationCommand::EmergencyStop.
+     */
+    EmergencyStop = 1,
+
+    /**
+     * @brief Превышены заданные лимиты симуляции, и политика требует останов.
+     *
+     * Контролируемые параметры модели вышли за пределы SimulationLimits
+     * при LimitViolationAction::StopSimulation.
+     */
+    SimulationLimitsExceeded = 2,
+
+    /**
+     * @brief Ошибка, явно сообщённая расчётной моделью.
+     *
+     * Используется, когда ModelAdapter::diagnostics() возвращает fault.
+     */
+    ModelAdapterFault = 3,
+
+    /**
+     * @brief Неподдерживаемый режим запуска simulation.
+     *
+     * Возникает, если SimulationConfig::runMode не соответствует ни одной
+     * зарегистрированной стратегии выполнения.
+     */
+    UnsupportedRunMode = 4
+};
+
 struct DiagnosticsSnapshot {
-    bool hasFault = false;
-    int faultCode = 0;
+    SimulationFaultCode faultCode = SimulationFaultCode::None;
     QString message;
+
+    [[nodiscard]] bool hasFault() const
+    {
+        return faultCode != SimulationFaultCode::None;
+    }
 };
 
 struct ModelOutputSnapshot {
@@ -208,6 +264,7 @@ struct ModelOutputSnapshot {
 
 // Для использования типов в мета-объектной системе Qt
 Q_DECLARE_METATYPE(emulator::simulation::SimulationState)
+Q_DECLARE_METATYPE(emulator::simulation::SimulationFaultCode)
 Q_DECLARE_METATYPE(emulator::simulation::DiagnosticsSnapshot)
 
 #endif // SIMULATIONTYPES_HPP

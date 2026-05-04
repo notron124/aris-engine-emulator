@@ -6,11 +6,6 @@
 
 namespace emulator::simulation::detail {
 
-namespace {
-constexpr int internalFaultCode = -1;
-constexpr int limitFaultCode = 2;
-} // namespace
-
 SimulationRunnerBase::SimulationRunnerBase(
     SimulationController& controller,
     model::ModelAdapter& modelAdapter,
@@ -74,9 +69,8 @@ SimulationRunnerBase::failureDiagnostics(
 {
     auto diagnostics =
         adapterInitialized_ ? modelAdapter_.diagnostics() : DiagnosticsSnapshot{};
-    if (!diagnostics.hasFault) {
-        diagnostics.hasFault = true;
-        diagnostics.faultCode = internalFaultCode;
+    if (!diagnostics.hasFault()) {
+        diagnostics.faultCode = SimulationFaultCode::InternalError;
         diagnostics.message = message;
     }
 
