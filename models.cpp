@@ -1,9 +1,10 @@
 #include <cmath>
 #include <algorithm>
+#include <cstdint>
 
-double thermal_step(double T_current, double T_steady, double tau, double dt) {
+double thermal_step(double T_prev, double T_steady, double tau, double dt) {
     // Общее уравнение для всех тепловых элементов
-    return T_steady + (T_current - T_steady) * std::exp(-dt / tau);
+    return T_steady + (T_prev - T_steady) * std::exp(-dt / tau);
 }
 
 
@@ -24,7 +25,8 @@ class ICE {
             
             // Какой-то простейший регулятор
             double omega_error = omega_target - omega_ICE;
-            double torque_demand = 50 * omega_error;
+            constexpr int toeque_gain = 50;
+            double torque_demand = toeque_gain * omega_error;
             
             // Ограничиваем моментом, который может выдать двигатель на текущих оборотах
             double max_torque = get_max_torque_at_speed(omega_ICE);
@@ -34,20 +36,24 @@ class ICE {
         }
         
         double get_max_torque_at_speed(double omega_rads) const {
-            // Получение максимального момента при текущих оборотах
+            // Максимальный момент зависит от текущих оборотов по ступенчатой зависимости
             double omega_rpm = omega_rads * 60/(2*M_PI);
             const double M_peak = 3500.0;
             double m_max = 0.0;
             if (omega_rpm < omega_max_run * 0.45) {
                 m_max = M_peak / 7 * (1 + 6 * (omega_rpm / (omega_max_run * 0.45)));
-            } else if (omega_rpm < omega_max_run * 0.8) {
+                return m_max;
+            } 
+            if (omega_rpm < omega_max_run * 0.8) {
                 m_max = M_peak;
-            } else if (omega_rpm < omega_max_run) {
+                return m_max;
+            }
+            if (omega_rpm < omega_max_run) {
                 double ratio = (omega_rpm - omega_max_run * 0.8) / (omega_max_run * 0.2);
                 m_max = M_peak * (1.0 - ratio * 0.25);
-            } else {
-                m_max = M_peak * 0.75;
+                return m_max;
             }
+            m_max = M_peak * 0.75;
             return m_max;
         }
         
@@ -72,9 +78,7 @@ class ICE {
             P_oil = (P_oil_zero_revs + omega_ICE / omega_max_run * (P_oil_max - P_oil_zero_revs)) * temp_factor;
         }
         
-        bool check_limits(bool is_in_running_mode) const {
-            // Проверка аварийных пределов
-            // Заменить на нормальные ошибки
+        bool is_limits_exceeded(bool is_in_running_mode) const {
             if (T_cool > T_max) {return true;}
             if (P_oil < P_oil_min) {return true;}
             if (P_oil > P_oil_max) {return true;}
@@ -126,17 +130,15 @@ class AsyncMotor {
             a_const(a_c), a_load(a_l), M_AD_nom(Mnom), flow_factor(a_c), M_max(Mnom * M_max_factor) {}
         
         
-        // Управление вентилятором
         void set_fan(bool enabled) { fan_enabled = enabled; }
         
         void update_flow_factor() {
-            // Расчёт коэффициента обдува
             if (fan_enabled) {
                 double load_ratio = std::abs(M_electromagnetic) / M_AD_nom;
                 flow_factor = a_const + a_load * load_ratio;
-            } else {
-                flow_factor = a_const;
+                return;
             }
+            flow_factor = a_const;   
         }
         
         void step(double dt, double omega_ICE, double omega_sync) {
@@ -158,11 +160,8 @@ class AsyncMotor {
             T_AD = thermal_step(T_AD, T_steady, tau_eff, dt);
         }
         
-        bool check_limits() const {
-            // Проверка пределов
-            // Заменить на нормальные ошибки
-            if (T_AD > T_max) {return true;}
-            return false;
+        bool is_limits_exceeded() const {
+            return T_AD > T_max;
         }
         
         double get_temperature() const { return T_AD; }
@@ -198,65 +197,62 @@ class AsyncMotor {
 
 
 class FrequencyConverter {
-public:
-    FrequencyConverter(int poles = 2, double M_max_factor = 2.2, double s_max = 0.05)
-        : p_poles(poles), M_max_factor(M_max_factor), s_max(s_max),
-          f_stator(0), omega_sync(0), target_torque(0), M_AD_nom(0) {}
-    
-    void set_ad_parameters(double M_nom) {
-        // Установка номинальных параметров АД
-        M_AD_nom = M_nom;
-        M_max = M_nom * M_max_factor;
-    }
-    
-    void set_target_torque(double torque_request, double omega_rotor) {
-        target_torque = std::clamp(torque_request, -M_max, M_max);
+    public:
+        FrequencyConverter(int poles = 2, double M_max_factor = 2.2, double s_max = 0.05)
+            : p_poles(poles), M_max_factor(M_max_factor), s_max(s_max),
+            omega_sync(0), target_torque(0), M_AD_nom(0) {}
         
-        if (std::abs(target_torque) < 1e-3) {
-            // Нет запроса - отключаем ПЧ
-            set_frequency(0);
-            return;
+        void set_ad_parameters(double M_nom) {
+            M_AD_nom = M_nom;
+            M_max = M_nom * M_max_factor;
         }
         
-        // Рассчитываем скольжение для получения нужного момента
-        double M_req_abs = std::abs(target_torque);
-        double sqrt_term = std::sqrt(M_max * M_max - M_req_abs * M_req_abs);
-        double slip_abs = (M_max + sqrt_term) / M_req_abs * s_max;
-        double slip = (target_torque > 0) ? slip_abs : -slip_abs;
+        void set_target_torque(double torque_request, double omega_rotor) {
+            target_torque = std::clamp(torque_request, -M_max, M_max);
+            
+            if (std::abs(target_torque) < 1e-3) {
+                // Нет запроса - отключаем ПЧ
+                set_omega_sync(0);
+                return;
+            }
+            
+            // Рассчитываем скольжение для получения нужного момента
+            double M_req_abs = std::abs(target_torque);
+            double sqrt_term = std::sqrt(M_max * M_max - M_req_abs * M_req_abs);
+            double slip_abs = (M_max + sqrt_term) / M_req_abs * s_max;
+            double slip = (target_torque > 0) ? slip_abs : -slip_abs;
+            
+            // Вычисляем синхронную скорость
+            double omega_sync_calc = omega_rotor / (1.0 - slip);
+            
+            // Устанавливаем частоту
+            set_omega_sync(omega_sync_calc * p_poles / (2 * M_PI));
+        }
         
-        // Вычисляем синхронную скорость
-        double omega_sync_calc = omega_rotor / (1.0 - slip);
+        void set_omega_sync(double omega) {
+            omega_sync = omega;
+        }
         
-        // Устанавливаем частоту
-        set_frequency(omega_sync_calc * p_poles / (2 * M_PI));
-    }
-    
-    void set_frequency(double f_hz) {
-        f_stator = f_hz;
-        omega_sync = 2 * M_PI * f_stator / p_poles;
-    }
-    
-    // Расчёт мощности на балласт (рекуперация)
-    double calc_ballast_power(double M_AD, double omega_rotor) const {
-        // Если АД работает в генераторе (торможение), мощность идёт в балласт
-        double slip_power = M_AD * (omega_rotor - omega_sync);
-        return std::max(0.0, slip_power);
-    }
-    
-    double get_sync_omega() const { return omega_sync; }
-    double get_target_torque() const { return target_torque; }
-    int get_poles() const { return p_poles; }
-    
-private:
-    int p_poles;                // число пар полюсов
-    double M_max_factor;        // перегрузочная способность
-    double s_max;               // критическое скольжение
-    double M_AD_nom;            // номинальный момент АД
-    double M_max;               // максимальный момент АД
-    
-    double f_stator;            // текущая частота, Гц
-    double omega_sync;          // синхронная скорость, рад/с
-    double target_torque;       // запрошенный момент, Н·м
+        double calc_ballast_power(double M_AD, double omega_rotor) const {
+            // Если АД работает в генераторе (торможение), мощность идёт в балласт
+            // Если нет, то балласт не стоит ненагруженным
+            double slip_power = M_AD * (omega_rotor - omega_sync);
+            return std::max(0.0, slip_power);
+        }
+        
+        double get_sync_omega() const { return omega_sync; }
+        double get_target_torque() const { return target_torque; }
+        int get_poles() const { return p_poles; }
+        
+    private:
+        uint8_t p_poles;            // число пар полюсов
+        double M_max_factor;        // перегрузочная способность
+        double s_max;               // критическое скольжение
+        double M_AD_nom;            // номинальный момент АД
+        double M_max;               // максимальный момент АД
+        
+        double omega_sync;          // синхронная скорость, рад/с
+        double target_torque;       // запрошенный момент, Н·м
 };
 
 class BallastResistor {
@@ -269,20 +265,18 @@ class BallastResistor {
             b_const(b_c), b_load(b_l), fan_factor(b_c) {}
         
         void set_power(double power) {
-            // Установка мощности от ЧП
             P_ballast = power;
         }
         
         void set_fan(bool enabled) { fan_enabled = enabled; }
         
         void update_fan_factor() {
-            // Расчёт коэффициента обдува
             if (fan_enabled) {
                 double load_ratio = P_ballast / P_nom;
                 fan_factor = b_const + b_load * load_ratio;
-            } else {
-                fan_factor = b_const;
+                return;
             }
+            fan_factor = b_const;
         }
         
         void step(double dt) {
@@ -291,11 +285,8 @@ class BallastResistor {
             T_ballast = thermal_step(T_ballast, T_steady, tau_ballast, dt);
         }
         
-        bool check_limits() const {
-            // Проверка пределов
-            // Заменить на нормальные ошибки
-            if (T_ballast > T_max) {return true;}
-            return false;
+        bool is_limits_exceeded() const {
+            return T_ballast > T_max;
         }
         
         double get_temperature() const { return T_ballast; }
