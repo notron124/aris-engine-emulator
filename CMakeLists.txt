@@ -7,11 +7,12 @@ project(stand-emulator
     LANGUAGES CXX
 )
 
-# ==============================================================================
-
 find_package(QT NAMES Qt6 REQUIRED COMPONENTS Core Network SerialPort SerialBus)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Network SerialPort SerialBus)
 qt_standard_project_setup()
+
+# Важно сделать до add_subdirectory, чтобы тесты проиндексировались
+include(CTest)
 
 add_subdirectory(components/modbus)
 add_subdirectory(components/registerbank)
@@ -25,8 +26,3 @@ target_link_libraries(aris-engine
         register-bank
         modbus-server
 )
-
-# ==============================================================================
-
-option(BUILD_TESTING "Build tests" OFF)
-include(CTest)

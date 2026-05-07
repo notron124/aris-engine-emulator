@@ -21,6 +21,10 @@ aris-engine-emulator/
 ├── CMakeLists.txt              # корневая сборка
 ├── main.cpp                    # точка входа приложения
 ├── README.md                   # краткое описание проекта и сборки
+├── docker-compose.yml          # контейнеризированная сборка и тестирование
+│
+├── .github/
+│   ├── workflows/              # описание GitHub Actions
 │
 ├── cmake/
 │   └── AddTests.cmake          # общий helper для автосборки test_*.cpp
@@ -35,6 +39,8 @@ aris-engine-emulator/
 ├── docs/
 │   ├── architecture/           # описание архитектуры, диаграммы
 │   └── intro/                  # ТТ и ТЗ
+│
+├── docker/                     # файлы с описанием образов для сборки в docker
 │
 └── tests/
     └── integration/            # тесты нескольких компонентов вместе

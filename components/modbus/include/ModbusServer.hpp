@@ -16,8 +16,18 @@ public:
                           QObject* parent = nullptr);
     ~ModbusServer() override;
 
+    /// @brief Запустить сервер на указанном адресе и порту.
+    /// @param address ip адресс, на котором будет запущен сервер.
+    /// @param port порт, на котором будет запущен сервер.
+    /// @return true, если запуск произведен успешно, false иначе.
     bool start(const QString& address, uint16_t port);
+
+    /// @brief Остановить работу сервера.
     void stop();
+
+
+    /// @brief Запущен ли сервер.
+    /// @return true, если сервер в состоянии работы, false иначе.
     bool isRunning() const;
 
 private:
