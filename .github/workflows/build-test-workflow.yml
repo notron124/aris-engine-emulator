@@ -13,23 +13,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    name: Build
+    name: Build & Test
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Build
         run: docker compose run --rm build-linux
-
-  test:
-    needs: build
-    runs-on: ubuntu-24.04
-    name: Test
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
       
       - name: Test
         run: docker compose run --rm test-linux
