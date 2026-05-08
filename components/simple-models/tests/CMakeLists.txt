@@ -6,5 +6,5 @@ add_tests(
         ${CMAKE_CURRENT_SOURCE_DIR}/../include
     LINK_LIBRARIES
         Qt${QT_VERSION_MAJOR}::SerialBus
-        simple_models
+        simple-models
 )
