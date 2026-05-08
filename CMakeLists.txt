@@ -29,6 +29,7 @@ target_link_libraries(aris-engine
         register-bank
         modbus-server
         simulation-controller
+        simple-models
 )
 
 # ==============================================================================
