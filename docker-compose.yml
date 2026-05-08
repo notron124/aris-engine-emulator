@@ -43,6 +43,7 @@ services:
 
     command: >
       sh -c "cmake -S . -B build \
+      -DBUILD_TESTING=ON \
       -G Ninja \
       && cmake --build build --parallel"
 
