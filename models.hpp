@@ -16,7 +16,7 @@ class ICE {
             double wmax_run = 2200.0 * (2*M_PI/60),
             double M_peak = 3500.0);
         
-        void set_target_omega(double target_omega_rads, double dt);
+        void set_target_omega(double target_omega_rads);
         
         double get_max_torque_at_speed(double omega_rads) const;
         
@@ -48,7 +48,7 @@ class ICE {
         // Параметры давления масла
         double P_oil;                                   // текущее давление масла, бар
         double P_oil_min, P_oil_max;                    // пределы по давлению масла, бар
-        static constexpr double P_oil_zero_revs = 0.5;  // давление на нулевых оборотах, бар
+        double P_oil_zero_revs;                         // давление на нулевых оборотах, бар
         
         double omega_max_prir, omega_max_run;           // пределы по оборотам, рад/с
 };

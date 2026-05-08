@@ -12,10 +12,10 @@ ICE::ICE(double J, double k_h, double k_rad, double tau, double Tamb,
          double Tmax, double Pmin, double Pmax, double wmax_prir, double wmax_run, double M_peak)
         : J_ICE(J), omega_ICE(0), M_drive(0), M_internal_fric(50),
         T_cool(Tamb), k_heat(k_h), k_radiator(k_rad), tau_cool(tau),
-        T_amb(Tamb), T_max(Tmax), P_oil(0), P_oil_min(Pmin), P_oil_max(Pmax),
+        T_amb(Tamb), T_max(Tmax), P_oil(0), P_oil_min(Pmin), P_oil_max(Pmax), P_oil_zero_revs(Pmin),
         omega_max_prir(wmax_prir), omega_max_run(wmax_run), M_peak(M_peak) {}
     
-void ICE::set_target_omega(double target_omega_rads, double dt) {
+void ICE::set_target_omega(double target_omega_rads) {
     omega_target = target_omega_rads;
     
     // Какой-то простейший регулятор
@@ -70,7 +70,7 @@ void ICE::step(double dt, double M_AD_torque, double J_AD) {
 
 bool ICE::is_limits_exceeded(bool is_in_running_mode) const {
     if (T_cool > T_max) {return true;}
-    if (P_oil < P_oil_min) {return true;}
+    if (P_oil < P_oil_min && omega_ICE > 0) {return true;}
     if (P_oil > P_oil_max) {return true;}
     if (is_in_running_mode && omega_ICE > omega_max_run) {return true;}
     if (!is_in_running_mode && omega_ICE > omega_max_prir) {return true;}
@@ -145,6 +145,7 @@ void FrequencyConverter::set_ad_parameters(double M_nom) {
 }
 
 void FrequencyConverter::set_target_torque(double torque_request, double omega_rotor) {
+    // Если необходим тормозной момент(режим обкатки), то torque_request должен быть отрицательным
     target_torque = std::clamp(torque_request, -M_max, M_max);
     
     if (std::abs(target_torque) < 1e-3) {
@@ -173,7 +174,7 @@ void FrequencyConverter::set_omega_sync(double omega) {
 double FrequencyConverter::calc_ballast_power(double M_AD, double omega_rotor) const {
     // Если АД работает в генераторе (торможение), мощность идёт в балласт
     // Если нет, то балласт не стоит ненагруженным
-    double slip_power = M_AD * (omega_rotor - omega_sync);
+    double slip_power = M_AD * (omega_sync - omega_rotor);
     return std::max(0.0, slip_power);
 }
 
