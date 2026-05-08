@@ -1,0 +1,17 @@
+# В этом образе не хватает qtserialbus.
+FROM stateoftheartio/qt6:6.7-mingw-aqt AS builder
+
+USER root
+
+RUN apt-get update && apt-get install -y python3-pip && \
+   pip3 install aqtinstall && \
+   rm -rf /var/lib/apt/lists/*
+
+# Качает с серверов qt, без vpn не работает
+RUN aqt install-qt windows desktop 6.7.0 win64_mingw --modules qtserialport
+
+WORKDIR /app
+
+FROM builder AS tester
+WORKDIR /app
+CMD ["ctest", "--output-on-failure"]
