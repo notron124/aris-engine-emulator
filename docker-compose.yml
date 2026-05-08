@@ -1,0 +1,62 @@
+services:
+  # Пока что не работает.
+  build-windows64:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.win64
+      target: builder
+
+    volumes:
+      - .:/app
+      - ./build-windows64:/app/build
+
+    working_dir: /app
+
+    command: >
+      sh -c 'qt-cmake . -G Ninja -B build; cmake --build build;
+           windeployqt --qmldir . --dir build/deploy --libdir build/deploy/libs --plugindir build/deploy/plugins build/*.exe'
+
+  test-windows64:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.win64
+      target: tester
+
+    volumes:
+      - ./build-windows64:/app/build
+
+    working_dir: /app/build
+
+    command: ctest --output-on-failure
+
+  build-linux:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.linux
+      target: builder
+
+    volumes:
+      - .:/app
+      - ./build-linux:/app/build
+
+    working_dir: /app
+
+    command: >
+      sh -c "cmake -S . -B build \
+      -DBUILD_TESTING=ON \
+      -G Ninja \
+      && cmake --build build --parallel"
+
+
+  test-linux:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.linux
+      target: tester
+
+    volumes:
+      - ./build-linux:/app/build
+
+    working_dir: /app/build
+
+    command: ctest --output-on-failure

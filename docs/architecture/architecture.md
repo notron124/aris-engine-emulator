@@ -89,90 +89,149 @@
 - Backend SCADA работает только с Modbus-регистрами.
 - Модуль моделирования выступает в роли `Modbus TCP Server`.
 - Backend SCADA выступает в роли `Modbus TCP Client`.
-- FMI-вызовы изолированы внутри `FmuAdapter`.
-- Соответствие между Modbus-регистрами и переменными FMU не является прямым; оно выполняется через слой контроллера и маппинга переменных.
+- В первой итерации слой моделирования работает через универсальный `ModelAdapter`, без прямой зависимости от FMI/FMU.
+- Будущий `FmiModelAdapter` должен быть одной из реализаций `ModelAdapter`.
+- Соответствие между Modbus-регистрами и внутренними структурами данных выполняется через `RegisterCodec`.
+- Передача данных между Modbus-слоем и слоем моделирования выполняется только атомарными снимками.
 
-Линейная схема:
+Линейная схема слоёв:
 
 ```text
-ModbusClient
+Backend SCADA
     ↓ Modbus TCP
-ModbusServer
+Modbus layer
     ↓
-SimulationController
+RegisterBank layer
     ↓
-FmuAdapter
+SnapshotExchange boundary
+    ↓
+SimulationController layer
+    ↓
+ModelAdapter layer
+    ↓
+SimulationModel layer
 ```
 
-Развёрнутая схема:
+Схема слоёв и пакетов:
 
 ```mermaid
 flowchart LR
-    Backend[Backend SCADA<br/>Modbus Client]
+    Backend["Backend SCADA<br/>Modbus Client"]
 
-    subgraph SimulationModule[Модуль моделирования<br/>Modbus Server]
-        ModbusInterface[ModbusInterface<br/>QModbusTcpServer]
-        RegisterBank[RegisterBank<br/>Modbus registers + codec]
-        SimulationController[SimulationController<br/>simulation lifecycle]
-        FmuAdapter[FmuAdapter<br/>FMI 2.0 Co-Simulation]
-        Diagnostics["DiagnosticsService (?)"<br/>errors, FMI status]
-        Configuration[Configuration<br/>YAML]
+    subgraph ModbusLayer["Modbus layer"]
+        ModbusServer["ModbusServer<br/>QModbusTcpServer"]
     end
 
-    subgraph FMU[FMU package]
-        ModelDescription[modelDescription.xml]
-        Binary[FMU binary]
-        Resources[resources]
+    subgraph RegisterLayer["RegisterBank layer"]
+        RegisterBank["RegisterBank<br/>raw register storage, atomic read/write"]
+        RegisterCodec["RegisterCodec<br/>registers -> DTO"]
     end
 
-    Backend <-->|Modbus TCP| ModbusInterface
-    ModbusInterface <--> RegisterBank
-    RegisterBank <--> SimulationController
-    SimulationController <--> FmuAdapter
-    FmuAdapter <--> FMU
-    Diagnostics --> RegisterBank
-    SimulationController --> Diagnostics
-    Configuration --> RegisterBank
-    Configuration --> SimulationController
-    Configuration --> FmuAdapter
+    subgraph SnapshotBoundary["SnapshotExchange boundary"]
+        SnapshotExchange["SimulationSnapshotExchange"]
+        BackendBridge["SimulationBackendBridge"]
+    end
+
+    subgraph SimulationLayer["SimulationController layer"]
+        SimulationController["SimulationController<br/>public snapshot API"]
+        SimulationRunner["SimulationRunner<br/>strategy interface"]
+        StepOnDemandRunner["StepOnDemandSimulationRunner"]
+        ContinuousRunner["ContinuousSimulationRunner"]
+        SimulationTypes["Simulation DTO / State / Config"]
+    end
+
+    subgraph ModelAdapterLayer["ModelAdapter layer"]
+        ModelAdapter["ModelAdapter<br/>model interface"]
+        FmiModelAdapter["FmiModelAdapter<br/>future FMI implementation"]
+    end
+
+    subgraph ModelLayer["SimulationModel"]
+        SimulationModel["SimulationModel<br/>stand model data"]
+    end
+
+    subgraph SharedServices["SharedServices"]
+        Diagnostics["DiagnosticsService (?)"]
+        Configuration["ConfigurationLoader"]
+    end
+
+    subgraph OptionalFMI["Optional FMI resources"]
+        ModelDescription["modelDescription.xml"]
+        Binary["FMU binary"]
+        Resources["resources"]
+    end
+
+    Backend -->|"Modbus TCP"| ModbusLayer
+    ModbusLayer -->|"raw registers"| RegisterLayer
+    RegisterLayer -->|"atomic register snapshots"| SnapshotBoundary
+    SnapshotBoundary <-->|"ClientInputSnapshot / ModelOutputSnapshot"| SimulationLayer
+    SimulationLayer -->|"model lifecycle / set / get / doStep"| ModelAdapterLayer
+    ModelAdapterLayer -->|"inputs / outputs"| ModelLayer
+    OptionalFMI -.-> ModelAdapterLayer
+    SharedServices -.-> RegisterLayer
+    SharedServices -.-> SimulationLayer
+    SharedServices -.-> ModelAdapterLayer
 ```
+
+Связи на схеме показывают зависимости между слоями. Внутренние связи между классами внутри одного package намеренно не раскрываются.
 
 Рабочий цикл:
 
 ```
 QModbusTcpServer принимает запись
     ↓
-RegisterBank обновляет значения
+ModbusServer передаёт значения в RegisterBank
     ↓
-SimulationController на своём цикле читает RegisterBank
+RegisterBank атомарно обновляет сырые регистры
     ↓
-SimulationController формирует ModelInputs
+SimulationBackendBridge получает запрос на обработку
     ↓
-FmuAdapter преобразует ModelInputs в FMI valueReferences
+SimulationSnapshotExchange читает атомарный снимок регистров из RegisterBank
     ↓
-FmuAdapter вызывает fmi2SetReal / fmi2SetInteger / fmi2SetBoolean
+RegisterCodec преобразует регистры в ClientInputSnapshot
     ↓
-FmuAdapter вызывает fmi2DoStep
+SimulationController::processSnapshot(ClientInputSnapshot)
     ↓
-FmuAdapter вызывает fmi2GetReal / fmi2GetInteger / fmi2GetBoolean
+SimulationRunner обрабатывает команду/запрос и при необходимости вызывает ModelAdapter
     ↓
-FmuAdapter формирует ModelOutputs
+ModelAdapter взаимодействует с Simulation model
     ↓
-SimulationController обновляет RegisterBank
+SimulationController возвращает std::optional<ModelOutputSnapshot>
+    ↓
+RegisterCodec преобразует ModelOutputSnapshot в снимок выходных регистров
+    ↓
+RegisterBank атомарно публикует выходные регистры
     ↓
 Backend SCADA читает Input Registers / Discrete Inputs
 ```
 
 ## 6. Компоненты модуля
 
+### Группировка компонентов по слоям
+
+| Слой | Компоненты | Назначение |
+| --- | --- | --- |
+| Modbus-интерфейс | `ModbusServer` | Modbus TCP-сервер, приём чтения/записи регистров |
+| Регистровый контракт | `RegisterBank`, `RegisterCodec` | Хранение регистров, codec, snapshot, масштабирование |
+| Граница обмена снимками | `SimulationSnapshotExchange`, `SimulationBackendBridge` | Атомарный обмен снимками между регистровым контрактом и слоем симуляции |
+| Оркестрация симуляции | `SimulationController`, `SimulationRunner` | Жизненный цикл моделирования, команды, состояния, simulation tick |
+| Адаптер модели | `ModelAdapter`, будущий `FmiModelAdapter` | Загрузка модели, model lifecycle, set/get/doStep |
+| Расчётная модель | `Simulation model` | Предоставление данных симуляции тестового стенда на основе входных параметров; с этим слоем взаимодействует `ModelAdapter` |
+| Сквозные сервисы | `DiagnosticsService`, `ConfigurationLoader` | Диагностика, конфигурация и параметры запуска компонентов |
+
 ### Сводное разделение ответственности
 
 | Компонент | Основная ответственность | Не должен делать |
 | --- | --- | --- |
 | `ModbusServer` | Modbus TCP-сервер, приём чтения/записи регистров | Выполнять моделирование, вызывать FMI |
-| `RegisterBank` | Хранение регистров, codec, snapshot, масштабирование | Управлять FMU, выполнять физику модели |
-| `SimulationController` | Жизненный цикл моделирования, команды, состояния, simulation tick | Работать напрямую с Modbus TCP или FMI API |
-| `FmuAdapter` | Загрузка FMU, FMI lifecycle, set/get/doStep | Знать о Modbus-регистрах и backend |
+| `RegisterBank` | Атомарное хранение сырых Modbus-регистров и публикация снимков регистров | Управлять моделью, выполнять физику модели |
+| `RegisterCodec` | Преобразование снимков регистров в DTO и обратно | Хранить регистры, запускать модель |
+| `SimulationSnapshotExchange` | Интерфейс обмена снимками между `RegisterBank`/`RegisterCodec` и backend bridge | Выполнять расчёт модели |
+| `SimulationBackendBridge` | Вызов `SimulationController` по готовому входному снимку и публикация выходного снимка | Кодировать регистры, управлять Modbus TCP |
+| `SimulationController` | Публичный snapshot API слоя моделирования и выбор режима выполнения | Работать напрямую с Modbus TCP, `RegisterBank` или FMI API |
+| `SimulationRunner` | Реализация режима выполнения модели: `StepOnDemand` или `Continuous` | Знать карту Modbus-регистров |
+| `ModelAdapter` | Универсальный интерфейс расчётной модели | Знать о Modbus-регистрах и backend |
+| `FmiModelAdapter` | Будущая реализация `ModelAdapter` поверх FMI/FMU | Быть обязательной зависимостью первой итерации |
+| `Simulation model` | Предоставление данных симуляции тестового стенда на основе входных параметров | Знать о Modbus TCP, регистрах и backend |
 | `DiagnosticsService`   | Ошибки, статусы, health flags                                     | Управлять процессом моделирования          |
 | `ConfigurationLoader`  | Загрузка YAML-конфигурации                                        | Выполнять runtime-логику модели            |
 
@@ -221,9 +280,9 @@ Backend SCADA читает Input Registers / Discrete Inputs
 
 ### 6.2 RegisterBank
 
-Компонент `RegisterBank` является внутренним хранилищем Modbus-регистров и основным слоем согласования между Modbus-интерфейсом и контроллером моделирования.
+Компонент `RegisterBank` является внутренним хранилищем Modbus-регистров.
 
-`RegisterBank` отделяет внешний Modbus-протокол от внутренней объектной модели приложения. Благодаря этому `SimulationController` работает не с сырыми Modbus-регистрами, а с типизированными структурами команд, уставок, состояний и телеметрии.
+`RegisterBank` отделяет внешний Modbus-протокол от внутренней объектной модели приложения. Он не формирует `ClientInputSnapshot` самостоятельно и не знает о правилах выполнения модели. Его задача — атомарно хранить сырые значения регистров и отдавать/принимать целостные снимки этих регистров.
 
 `RegisterBank` содержит:
 
@@ -231,41 +290,68 @@ Backend SCADA читает Input Registers / Discrete Inputs
 - значения `Discrete Inputs`;
 - значения `Input Registers`;
 - значения `Holding Registers`;
-- правила кодирования и декодирования значений;
-- правила масштабирования инженерных величин;
-- правила преобразования регистров в типизированные структуры;
-- механизм безопасного обмена данными между Modbus-потоком и циклом моделирования.
+- механизм атомарного чтения входного снимка регистров;
+- механизм атомарной публикации выходного снимка регистров;
+- механизм безопасного обмена данными между Modbus-потоком и backend bridge.
 
 #### Ответственность
 
 - хранение актуальных значений Modbus-регистров;
-- декодирование входных значений, записанных backend'ом;
-- кодирование выходных значений модели в Modbus-регистры;
-- предоставление `SimulationController` типизированного снимка входных данных;
-- публикация выходов модели в `Input Registers`;
-- публикация статусов модели в `Discrete Inputs`;
-- публикация диагностических кодов в регистры состояния (?);
-- проверка диапазонов значений;
-- применение масштабирования;
-- централизованное описание Modbus-контракта.
+- применение записей, полученных от `ModbusServer`;
+- выдача атомарного снимка входных регистров;
+- атомарная публикация выходных регистров, подготовленных через `RegisterCodec`;
+- предоставление `ModbusServer` актуальных значений для чтения backend'ом.
 
 Не должен:
 
-- запускать или останавливать FMU;
-- выполнять `fmi2DoStep`;
+- декодировать регистры в `ClientInputSnapshot`;
+- кодировать `ModelOutputSnapshot` в регистры;
+- запускать или останавливать модель;
+- выполнять шаг моделирования;
 - принимать решения о переходе между режимами;
 - реализовывать физику модели;
 - напрямую взаимодействовать с backend помимо слоя `ModbusServer`.
 
+##### RegisterCodec и SimulationSnapshotExchange
+
+Преобразование между сырыми регистрами и DTO выполняет `RegisterCodec`.
+
+```text
+raw register snapshot -> RegisterCodec -> ClientInputSnapshot
+ModelOutputSnapshot -> RegisterCodec -> raw register snapshot
+```
+
+`SimulationSnapshotExchange` является интерфейсом доступа к этим операциям. Production-реализация этого интерфейса должна связать `RegisterBank` и `RegisterCodec`:
+
+```cpp
+ClientInputSnapshot RegisterBankSimulationExchange::readClientInputSnapshot()
+{
+    const auto registers = registerBank_.readInputSnapshot();
+    return codec_.decodeClientInput(registers);
+}
+
+void RegisterBankSimulationExchange::publishModelOutputSnapshot(
+    const ModelOutputSnapshot& snapshot)
+{
+    const auto registers = codec_.encodeModelOutput(snapshot);
+    registerBank_.writeOutputSnapshot(registers);
+}
+```
+
+Таким образом, `SimulationController` не зависит от `RegisterBank`, `RegisterCodec` и карты Modbus-регистров. Он получает только готовый `ClientInputSnapshot` и возвращает `ModelOutputSnapshot`.
+
 ##### Потокобезопасность
 
-Так как Modbus-запросы и цикл моделирования могут выполняться независимо, `RegisterBank` должен обеспечивать согласованный доступ к данным.
+Так как Modbus-запросы и расчёт модели могут выполняться независимо, `RegisterBank` должен обеспечивать согласованный доступ к данным.
 
 Возможный подход:
 
 - `ModbusServer` записывает значения в `RegisterBank`.
-- `SimulationController` читает не отдельные регистры, а атомарный снимок входных данных.
-- `SimulationController` публикует результаты моделирования как атомарный снимок выходных данных.
+- `SimulationSnapshotExchange` читает не отдельные регистры, а атомарный снимок входных регистров.
+- `RegisterCodec` преобразует снимок регистров в `ClientInputSnapshot`.
+- `SimulationBackendBridge` передаёт `ClientInputSnapshot` в `SimulationController`.
+- `SimulationController` возвращает `ModelOutputSnapshot`, если есть данные для публикации.
+- `SimulationSnapshotExchange` через `RegisterCodec` и `RegisterBank` публикует результаты моделирования как атомарный снимок выходных регистров.
 - `ModbusServer` отдаёт backend'у уже опубликованные значения регистров.
 
 Это предотвращает ситуацию, когда часть уставок уже обновлена, а часть ещё содержит старые значения.
@@ -278,32 +364,33 @@ Backend SCADA читает Input Registers / Discrete Inputs
 
 Компонент SimulationController является центральным координатором моделирования.
 
-Он связывает внешний Modbus-контракт с внутренним `FmuAdapter`. `SimulationController` не работает напрямую с `QModbusTcpServer` и не вызывает низкоуровневые FMI-функции напрямую. Для обмена с backend он использует `RegisterBank`, а для работы с FMU — `FmuAdapter`.
+Он не работает напрямую с `QModbusTcpServer`, `RegisterBank`, `RegisterCodec` и FMI API. Внешний слой передаёт ему готовый `ClientInputSnapshot`, а `SimulationController` возвращает `std::optional<ModelOutputSnapshot>`.
+
+Расчёт модели выполняется через выбранную стратегию `SimulationRunner`, а доступ к конкретной модели — через универсальный интерфейс `ModelAdapter`.
 
 #### Ответственность
 
-- чтение команд и уставок из `RegisterBank`;
-- преобразование данных из `RegisterBank` во входную структуру `ModelInputs`;
+- приём `ClientInputSnapshot` через метод `processSnapshot`;
 - управление состоянием моделирования:
     - запуск моделирования;
     - останов моделирования;
 - сброс модели;
 - обработка аварийной остановки;
-- передача входных значений в `FmuAdapter`;
-- вызов шага моделирования через `FmuAdapter`;
-- получение выходных значений из `FmuAdapter`;
-- преобразование выходов FMU в структуру `ModelOutputs`;
-- публикация телеметрии в `RegisterBank`;
-- публикация состояния моделирования в `RegisterBank`;
-- публикация диагностической информации в `RegisterBank`;
-- контроль частоты шага моделирования;
-- контроль переходов между состояниями модели;
-- передача ошибок в `DiagnosticsService` (?).
+- выбор стратегии выполнения по `SimulationRunMode`;
+- делегирование расчёта в `SimulationRunner`;
+- передача входных значений в `ModelAdapter`;
+- вызов шага моделирования через `ModelAdapter`;
+- получение выходных значений из `ModelAdapter`;
+- формирование `ModelOutputSnapshot`;
+- контроль переходов между состояниями симуляции;
+- передача ошибок и диагностических событий в `DiagnosticsService` (?).
 
 Не должен:
 
 - напрямую обслуживать Modbus TCP-соединения;
 - напрямую обращаться к `QModbusTcpServer`;
+- напрямую обращаться к `RegisterBank`;
+- вызывать `RegisterCodec`;
 - хранить карту Modbus-регистров;
 - напрямую вызывать `fmi2SetReal`, `fmi2DoStep`, `fmi2GetReal` и другие FMI-функции;
 - знать внутреннее устройство FMU;
@@ -312,21 +399,66 @@ Backend SCADA читает Input Registers / Discrete Inputs
 
 #### Цикл работы
 
-1. Прочитать снимок команд и уставок из `RegisterBank`.
-2. Обработать команды.
-4. Сформировать `ModelInputs`.
-5. Передать `ModelInputs` в `FmuAdapter`.
-6. Выполнить шаг моделирования через `FmuAdapter`.
-7. Получить `ModelOutputs` из `FmuAdapter`.
-9. Опубликовать телеметрию, статусы и диагностику в `RegisterBank`.
+Публичный цикл обработки одного снимка:
+
+1. Получить `ClientInputSnapshot` в `processSnapshot`.
+2. Передать снимок в выбранный `SimulationRunner`.
+3. Обработать команду управления: `Start`, `Stop`, `Reset`, `EmergencyStop` или отсутствие команды.
+4. Обработать запрос: `ReadCurrentState`, `StepAndRead` или отсутствие запроса.
+5. При необходимости передать `ModelInputs` в `ModelAdapter`.
+6. При необходимости выполнить один или несколько внутренних шагов модели.
+7. Получить `ModelOutputs` и диагностику из `ModelAdapter`.
+8. Сформировать `ModelOutputSnapshot`.
+9. Вернуть `std::optional<ModelOutputSnapshot>` вызывающему `SimulationBackendBridge`.
+
+`SimulationController` не публикует данные в `RegisterBank` самостоятельно. Публикацию выполняет внешний слой через `SimulationSnapshotExchange`.
 
 #### Структура данных
 
-> TODO Можно добавить и структуру состояний и диаграмму состояний. Тогда надо поправить Цикл работы, добавив упоминание контроля состояния.
+Диаграмма классов (упрощённая):
 
-### 6.4 FmuAdapter
+```mermaid
+classDiagram
+    direction LR
 
-`FmuAdapter` является внутренним компонентом модуля моделирования. `Backend SCADA` не взаимодействует с ним напрямую и не знает о существовании FMI API.
+    class SimulationController
+    class SimulationRunner {
+        <<interface>>
+    }
+    class SimulationRunnerBase {
+        <<abstract>>
+    }
+    class StepOnDemandSimulationRunner
+    class ContinuousSimulationRunner
+    class ModelAdapter {
+        <<interface>>
+    }
+    class SimulationBackendBridge
+    class SimulationSnapshotExchange {
+        <<interface>>
+    }
+
+    SimulationController *-- SimulationRunner : owns
+    SimulationRunner <|-- SimulationRunnerBase
+    SimulationRunnerBase <|-- StepOnDemandSimulationRunner
+    SimulationRunnerBase <|-- ContinuousSimulationRunner
+
+    SimulationRunnerBase --> ModelAdapter : uses
+
+    SimulationBackendBridge --> SimulationController : calls processSnapshot()
+    SimulationBackendBridge --> SimulationSnapshotExchange : reads/publishes snapshots
+
+    ContinuousSimulationRunner --> ContinuousSimulationRunner : worker thread
+
+```
+
+### 6.4 ModelAdapter и будущий FmiModelAdapter
+
+`ModelAdapter` является универсальным интерфейсом доступа к расчётной модели. `SimulationController` и `SimulationRunner` работают только с этим интерфейсом и не знают, как именно реализована модель.
+
+В первой итерации слой моделирования не обязан использовать FMI/FMU. Если в дальнейшем потребуется подключить FMU, должна быть добавлена реализация `FmiModelAdapter`, которая реализует интерфейс `ModelAdapter` и инкапсулирует все детали FMI API.
+
+`Backend SCADA` не взаимодействует с `ModelAdapter` напрямую и не знает о существовании FMI API.
 
 **FMI (Functional Mock-up Interface)** — это [стандартный интерфейс](https://fmi-standard.org/) для обмена и интеграции динамических моделей. 
 
@@ -344,6 +476,17 @@ FMU — переносимый "чёрный ящик" модели + API для
 ![FMI & FMU](image.png)
 
 #### Ответственность
+
+Общая ответственность `ModelAdapter`:
+
+- инициализация модели;
+- сброс модели;
+- приём `ModelInputs`;
+- выполнение шага моделирования;
+- выдача `ModelOutputs`;
+- выдача диагностического снимка модели.
+
+Будущая ответственность `FmiModelAdapter`:
 
 - распаковка FMU-пакета;
 - чтение `modelDescription.xml`;
@@ -392,7 +535,7 @@ FMU — переносимый "чёрный ящик" модели + API для
 
 Внутри FMU переменные идентифицируются не строковыми именами, а числовыми `valueReference`.
 
-Поэтому `FmuAdapter` должен использовать слой маппинга переменных:
+Поэтому `FmiModelAdapter` должен использовать слой маппинга переменных:
 
 ```
 ModelInputs / ModelOutputs
@@ -419,6 +562,65 @@ fmi2Set* / fmi2Get*
 ## 8. Сценарии обмена
 
 > TODO Указать состояние ключевых структур данных
+
+Общий сценарий обработки Modbus-запроса:
+
+```mermaid
+sequenceDiagram
+    participant Client as "Modbus Client"
+    participant Server as "ModbusServer"
+    participant Bank as "RegisterBank"
+    participant Bridge as "SimulationBackendBridge"
+    participant Exchange as "SimulationSnapshotExchange"
+    participant Codec as "RegisterCodec"
+    participant Controller as "SimulationController"
+    participant Runner as "SimulationRunner"
+    participant Adapter as "ModelAdapter"
+
+    Client->>Server: Write/Read request
+    Server->>Bank: write/read raw registers
+    Note over Bank: Атомарность сырых регистров контролирует RegisterBank
+
+    Server->>Bridge: slot_processRequest()
+
+    Bridge->>Exchange: readClientInputSnapshot()
+    Exchange->>Bank: read register snapshot
+    Bank-->>Exchange: raw register snapshot
+    Exchange->>Codec: decodeClientInput(registers)
+    Codec-->>Exchange: ClientInputSnapshot
+    Exchange-->>Bridge: ClientInputSnapshot
+
+    Bridge->>Controller: processSnapshot(input)
+    Controller->>Runner: processSnapshot(input)
+
+    alt command/request требует расчёта
+        Runner->>Adapter: setInputs(ModelInputs)
+        loop по integrationStep
+            Runner->>Adapter: step(modelTime, dt)
+        end
+        Runner->>Adapter: readOutputs()
+        Adapter-->>Runner: ModelOutputs
+        Runner-->>Controller: ModelOutputSnapshot
+    else только чтение состояния
+        Runner-->>Controller: last ModelOutputSnapshot / state snapshot
+    else нечего публиковать
+        Runner-->>Controller: std::nullopt
+    end
+
+    Controller-->>Bridge: optional ModelOutputSnapshot
+
+    alt output есть
+        Bridge->>Exchange: publishModelOutputSnapshot(output)
+        Exchange->>Codec: encodeModelOutput(output)
+        Codec-->>Exchange: raw register snapshot
+        Exchange->>Bank: write output register snapshot
+        Note over Bank: Атомарная публикация выходных регистров
+    else output нет
+        Bridge-->>Server: no output produced
+    end
+
+    Server-->>Client: Modbus response
+```
 
 ### 8.1 Запуск моделирования
 
