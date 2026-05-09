@@ -1,7 +1,7 @@
 #ifndef SIMULATIONCONTROLLER_HPP
 #define SIMULATIONCONTROLLER_HPP
 
-#include "SimulationTypes.hpp"
+#include "simulation/controller/SimulationTypes.hpp"
 
 #include <QObject>
 

@@ -2,8 +2,8 @@
 #define SIMULATIONRUNNER_HPP
 
 #include "ModelAdapter.hpp"
-#include "SimulationController.hpp"
-#include "SimulationTypes.hpp"
+#include "simulation/controller/SimulationController.hpp"
+#include "simulation/controller/SimulationTypes.hpp"
 
 #include <QString>
 

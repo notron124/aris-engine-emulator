@@ -1,4 +1,4 @@
-#include "SimulationController.hpp"
+#include "simulation/controller/SimulationController.hpp"
 
 #include "runners/ContinuousSimulationRunner.hpp"
 #include "runners/StepOnDemandSimulationRunner.hpp"

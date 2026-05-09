@@ -1,8 +1,8 @@
 #ifndef MODELCONTRACT_HPP
 #define MODELCONTRACT_HPP
 
-#include "simulation/units/SimulationDomain.hpp"
-#include "simulation/units/ModelDiagnostics.hpp"
+#include "simulation/contracts/SimulationDomain.hpp"
+#include "simulation/contracts/ModelDiagnostics.hpp"
 
 namespace emulator::model {
 

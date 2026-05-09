@@ -1,9 +1,9 @@
 #ifndef EXCHANGECONTRACT_HPP
 #define EXCHANGECONTRACT_HPP
 
-#include "simulation/units/ModelContract.hpp"
-#include "simulation/units/SimulationDiagnostics.hpp"
-#include "simulation/units/SimulationDomain.hpp"
+#include "simulation/contracts/ModelContract.hpp"
+#include "simulation/contracts/SimulationDiagnostics.hpp"
+#include "simulation/contracts/SimulationDomain.hpp"
 
 #include <QDateTime>
 

@@ -1,7 +1,7 @@
 #ifndef SIMULATIONTYPES_HPP
 #define SIMULATIONTYPES_HPP
 
-#include <simulation/Units.h>
+#include <simulation/Contracts.h>
 
 #include <QMetaType>
 
