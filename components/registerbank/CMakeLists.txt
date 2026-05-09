@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(register-bank
   # src/ModbusServer.cpp
-  # src/ModbusTcpServer.cpp
+  src/RegisterBank.cpp
   include/RegisterBank.hpp
   # src/ModbusTcpServer.hpp
 )
