@@ -1,7 +1,7 @@
 #ifndef SIMULATIONSNAPSHOTEXCHANGE_HPP
 #define SIMULATIONSNAPSHOTEXCHANGE_HPP
 
-#include "SimulationTypes.hpp"
+#include "simulation/controller/SimulationTypes.hpp"
 
 namespace emulator::simulation {
 
@@ -16,8 +16,9 @@ class SimulationSnapshotExchange {
 public:
     virtual ~SimulationSnapshotExchange() = default;
 
-    [[nodiscard]] virtual ClientInputSnapshot readClientInputSnapshot() = 0;
-    virtual void publishModelOutputSnapshot(const ModelOutputSnapshot& snapshot) = 0;
+    [[nodiscard]] virtual exchange::ClientInputSnapshot readClientInputSnapshot() = 0;
+    virtual void publishModelOutputSnapshot(
+        const exchange::ModelOutputSnapshot& snapshot) = 0;
 };
 
 } // namespace emulator::simulation
