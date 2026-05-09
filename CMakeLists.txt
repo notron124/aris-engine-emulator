@@ -19,6 +19,7 @@ qt_standard_project_setup()
 add_subdirectory(components/modbus)
 add_subdirectory(components/registerbank)
 add_subdirectory(components/simulation)
+add_subdirectory(components/modeladapter)
 
 add_executable(aris-engine
     main.cpp
