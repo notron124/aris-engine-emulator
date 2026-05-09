@@ -1,0 +1,26 @@
+name: Build and Test
+
+# Пока что только под linux, возможно, успею сделать сборку под windows.
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    name: Build & Test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: docker compose run --rm build-linux
+      
+      - name: Test
+        run: docker compose run --rm test-linux
