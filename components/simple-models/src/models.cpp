@@ -9,19 +9,19 @@ double thermal_step(double T_prev, double T_steady, double tau, double dt) {
 
 //--------------------------- ДВС ---------------------------------------------------
 ICE::ICE(double J, double k_h, double k_rad, double tau, double Tamb, 
-         double Tmax, double Pmin, double Pmax, double wmax_prir, double wmax_run, double M_peak)
+         double Tmax, double Pmin, double Pmax, double n_rpm_max_prir, double n_rpm_max_run, double M_peak)
         : J_ICE(J), omega_ICE(0), M_drive(0), M_internal_fric(50),
         T_cool(Tamb), k_heat(k_h), k_radiator(k_rad), tau_cool(tau),
         T_amb(Tamb), T_max(Tmax), P_oil(0), P_oil_min(Pmin), P_oil_max(Pmax), P_oil_zero_revs(Pmin),
-        omega_max_prir(wmax_prir), omega_max_run(wmax_run), M_peak(M_peak) {}
+        omega_max_prir(n_rpm_max_prir * 2 * M_PI / 60), omega_max_run(n_rpm_max_run * 2 * M_PI / 60), M_peak(M_peak) {}
     
-void ICE::set_target_omega(double target_omega_rads) {
-    omega_target = target_omega_rads;
+void ICE::set_target_n_rpm(double target_n_rpm) {
+    omega_target = target_n_rpm * 2 * M_PI / 60;
     
     // Какой-то простейший регулятор
     double omega_error = omega_target - omega_ICE;
-    constexpr int toeque_gain = 50;
-    double torque_demand = toeque_gain * omega_error;
+    constexpr int torque_gain = 25;
+    double torque_demand = torque_gain * omega_error;
     
     // Ограничиваем моментом, который может выдать двигатель на текущих оборотах
     double max_torque = ICE::get_max_torque_at_speed(omega_ICE);
@@ -32,16 +32,14 @@ void ICE::set_target_omega(double target_omega_rads) {
 
 double ICE::get_max_torque_at_speed(double omega_rads) const {
     // Максимальный момент зависит от текущих оборотов по ступенчатой зависимости
-    double omega_rpm = omega_rads * 60/(2*M_PI);
-    const double M_peak = 3500.0;
-    if (omega_rpm < omega_max_run * 0.45) {
-        return M_peak / 7 * (1 + 6 * (omega_rpm / (omega_max_run * 0.45)));
+    if (omega_rads < omega_max_run * 0.45) {
+        return M_peak / 7 * (1 + 6 * (omega_rads / (omega_max_run * 0.45)));
     } 
-    if (omega_rpm < omega_max_run * 0.8) {
+    if (omega_rads < omega_max_run * 0.8) {
         return M_peak;
     }
-    if (omega_rpm < omega_max_run) {
-        double ratio = (omega_rpm - omega_max_run * 0.8) / (omega_max_run * 0.2);
+    if (omega_rads < omega_max_run) {
+        double ratio = (omega_rads - omega_max_run * 0.8) / (omega_max_run * 0.2);
         return M_peak * (1.0 - ratio * 0.25);
     }
     return M_peak * 0.75;
@@ -50,6 +48,7 @@ double ICE::get_max_torque_at_speed(double omega_rads) const {
 void ICE::step(double dt, double M_AD_torque, double J_AD) {
     // M_AD_torque приходит от АД (может быть положительным или отрицательным)
     M_internal_fric = 50.0 + 0.1 * omega_ICE;  // Какая-то зависимость трения от скорости
+    set_target_n_rpm(omega_target * 60 / (2 * M_PI));
     double M_net = M_drive - M_internal_fric + M_AD_torque;
     double alpha = M_net / (J_ICE + J_AD);
     omega_ICE += alpha * dt;
@@ -63,7 +62,7 @@ void ICE::step(double dt, double M_AD_torque, double J_AD) {
     // Давление масла 
     // Упрощённо растёт с оборотами, падает с температурой
     // При превышение температуры над номинальной 80 давление падает
-    double temp_factor = std::max(0.1, 1.0 - (T_cool - 80)/100.0);
+    double temp_factor = std::max(0.1, 1 / (1.0 + (T_cool - 80)/50.0));
     // При максимальных оборотах давление близко к предельному, но не равно ему
     P_oil = (P_oil_zero_revs + omega_ICE / omega_max_run * (P_oil_max - P_oil_zero_revs)) * temp_factor;
 }
@@ -80,9 +79,9 @@ bool ICE::is_limits_exceeded(bool is_in_running_mode) const {
 double ICE::get_omega() const { return omega_ICE; }
 double ICE::get_temperature() const { return T_cool; }
 double ICE::get_oil_pressure() const { return P_oil; }
-void ICE::set_omega(double w) {
+void ICE::set_n_rpm(double n_rpm) {
     // имитация пуска от стратера 
-    omega_ICE = w;
+    omega_ICE = n_rpm * 2 * M_PI / 60;
 }
 
 
@@ -131,7 +130,7 @@ bool AsyncMotor::is_limits_exceeded() const {
 
 double AsyncMotor::get_temperature() const { return T_AD; }
 double AsyncMotor::get_moment() const { return M_electromagnetic;}
-double AsyncMotor::get_omega() const { return omega_AD; }
+double AsyncMotor::get_n_rpm() const { return omega_AD * 60 / (2 * M_PI); }
 
 
 //--------------------------- ЧП ---------------------------------------------------
@@ -144,7 +143,7 @@ void FrequencyConverter::set_ad_parameters(double M_nom) {
     M_max = M_nom * M_max_factor;
 }
 
-void FrequencyConverter::set_target_torque(double torque_request, double omega_rotor) {
+void FrequencyConverter::set_target_torque(double torque_request, double n_rpm_rotor) {
     // Если необходим тормозной момент(режим обкатки), то torque_request должен быть отрицательным
     target_torque = std::clamp(torque_request, -M_max, M_max);
     
@@ -161,21 +160,21 @@ void FrequencyConverter::set_target_torque(double torque_request, double omega_r
     double slip = (target_torque > 0) ? slip_abs : -slip_abs;
     
     // Вычисляем синхронную скорость
-    double omega_sync_calc = omega_rotor / (1.0 - slip);
+    double omega_sync_calc = 2 * M_PI * n_rpm_rotor * p_poles / 60 / (1.0 - slip);
     
     // Устанавливаем частоту
-    FrequencyConverter::set_omega_sync(omega_sync_calc * p_poles / (2 * M_PI));
+    FrequencyConverter::set_omega_sync(omega_sync_calc);
 }
 
 void FrequencyConverter::set_omega_sync(double omega) {
     omega_sync = omega;
 }
 
-double FrequencyConverter::calc_ballast_power(double M_AD, double omega_rotor) const {
+double FrequencyConverter::calc_ballast_power(double M_AD, double n_rpm_rotor) const {
     // Если АД работает в генераторе (торможение), мощность идёт в балласт
     // Если нет, то балласт не стоит ненагруженным
-    double slip_power = M_AD * (omega_sync - omega_rotor);
-    return std::max(0.0, slip_power);
+    if (M_AD > 0) {return 0.0;}
+    return std::max(0.0, M_AD * (omega_sync - 2 * M_PI * n_rpm_rotor * p_poles / 60));
 }
 
 double FrequencyConverter::get_sync_omega() const { return omega_sync; }

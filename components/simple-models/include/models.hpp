@@ -12,11 +12,11 @@ class ICE {
         ICE(double J = 3.5, double k_h = 0.30, double k_rad = 450.0, 
             double tau = 40.0, double Tamb = 25.0, double Tmax = 105.0,
             double Pmin = 1.5, double Pmax = 7.0,
-            double wmax_prir = 200.0 * (2*M_PI/60),
-            double wmax_run = 2200.0 * (2*M_PI/60),
+            double n_rpm_max_prir = 200.0,
+            double n_rpm_max_run = 2200.0,
             double M_peak = 3500.0);
         
-        void set_target_omega(double target_omega_rads);
+        void set_target_n_rpm(double target_n_rpm);
         
         double get_max_torque_at_speed(double omega_rads) const;
         
@@ -27,7 +27,7 @@ class ICE {
         double get_omega() const;
         double get_temperature() const;
         double get_oil_pressure() const;
-        void set_omega(double w);
+        void set_n_rpm(double n_rpm);
 
     private:
         double J_ICE;               // момент инерции ДВС, кг·м²
@@ -70,7 +70,7 @@ class AsyncMotor {
         
         double get_temperature() const;
         double get_moment() const;
-        double get_omega() const;
+        double get_n_rpm() const;
 
     private:
         double J_AD;                // момент инерции ротора, кг·м²
@@ -105,11 +105,11 @@ class FrequencyConverter {
         
         void set_ad_parameters(double M_nom);
         
-        void set_target_torque(double torque_request, double omega_rotor);
+        void set_target_torque(double torque_request, double n_rpm_rotor);
         
         void set_omega_sync(double omega);
         
-        double calc_ballast_power(double M_AD, double omega_rotor) const;
+        double calc_ballast_power(double M_AD, double n_rpm_rotor) const;
         
         double get_sync_omega() const;
         double get_target_torque() const;

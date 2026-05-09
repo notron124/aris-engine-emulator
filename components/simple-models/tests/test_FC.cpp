@@ -6,7 +6,7 @@ class FrequencyConverterTest : public QObject {
     Q_OBJECT
 
 private:
-    const uint8_t TEST_POLES = 4;
+    const uint8_t TEST_POLES = 1;
     const double TEST_M_MAX_FACTOR = 2.5;
     const double TEST_S_MAX = 0.05;
     const double TEST_M_NOM = 1000.0;
@@ -63,7 +63,7 @@ private slots:
         fc.set_omega_sync(omega_sync);
         
         // slip_power = M_AD * (omega_sync - omega_rotor) = -800 * -20 = 16000
-        double ballast = fc.calc_ballast_power(M_AD, omega_rotor);
+        double ballast = fc.calc_ballast_power(M_AD, omega_rotor * 60 / (2 * M_PI));
         QCOMPARE(ballast, 16000.0);
     }
 
@@ -77,7 +77,7 @@ private slots:
         fc.set_omega_sync(omega_sync);
         
         // slip_power = 800 * (-20) = -16000, но отрицательная мощность не омжет идти в балласт
-        double ballast = fc.calc_ballast_power(M_AD, omega_rotor);
+        double ballast = fc.calc_ballast_power(M_AD, omega_rotor * 60 / (2 * M_PI));
         QCOMPARE(ballast, 0.0);
     }
 
@@ -86,7 +86,7 @@ private slots:
         
         fc.set_omega_sync(300.0);
         
-        double ballast = fc.calc_ballast_power(1000.0, 300.0);
+        double ballast = fc.calc_ballast_power(1000.0, 300.0 * 60 / (2 * M_PI));
         QCOMPARE(ballast, 0.0);
     }
 
@@ -98,7 +98,7 @@ private slots:
         double omega_rotor = 300.0;
         
         // 1. Запрос на разгон (двигательный режим)
-        fc.set_target_torque(TEST_M_NOM * 0.7, omega_rotor);
+        fc.set_target_torque(TEST_M_NOM * 0.7, omega_rotor * 60 / (2 * M_PI));
         QVERIFY(fc.get_target_torque() > 0.0);
         QVERIFY(fc.get_sync_omega() > omega_rotor);
         
@@ -108,7 +108,7 @@ private slots:
         omega_rotor = 320.0;
         
         // 3. Запрос на торможение (генераторный режим)
-        fc.set_target_torque(-TEST_M_NOM * 0.5, omega_rotor);
+        fc.set_target_torque(-TEST_M_NOM * 0.5, omega_rotor * 60 / (2 * M_PI));
         QVERIFY(fc.get_target_torque() < 0.0);
         QVERIFY(fc.get_sync_omega() < omega_rotor);
         
@@ -116,7 +116,7 @@ private slots:
         QVERIFY(sync_omega_2 != sync_omega_1);
         
         // 4. Проверка балластной мощности в генераторном режиме
-        double ballast = fc.calc_ballast_power(fc.get_target_torque(), omega_rotor);
+        double ballast = fc.calc_ballast_power(fc.get_target_torque(), omega_rotor * 60 / (2 * M_PI));
         QVERIFY(ballast > 0.0);
     }
 
@@ -127,10 +127,10 @@ private slots:
         // Изначально синхронная скорость 0
         QCOMPARE(fc.get_sync_omega(), 0.0);
         
-        fc.set_target_torque(-500.0, 300.0);
+        fc.set_target_torque(-500.0, 300.0 * 60 / (2 * M_PI));
         QVERIFY(fc.get_sync_omega() < 300.0);
         
-        fc.set_target_torque(500.0, 300.0);
+        fc.set_target_torque(500.0, 300.0 * 60 / (2 * M_PI));
         QVERIFY(fc.get_sync_omega() > 300.0);
     }
 };

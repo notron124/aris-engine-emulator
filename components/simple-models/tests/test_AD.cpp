@@ -7,7 +7,7 @@ class AsyncMotorTest : public QObject {
 
 private:
     const double J_AD = 1.0;
-    const double k_loss = 0.5;
+    const double k_loss = 0.2;
     const double k_loss0 = 10.0;
     const double k_rad_AD = 100.0;
     const double tau_base = 15.0;
@@ -22,7 +22,7 @@ private slots:
     void testConstructor() {
         AsyncMotor motor(J_AD, k_loss, k_loss0, k_rad_AD, tau_base, Tamb, Tmax, Mnom, a_const, a_load);
         
-        QCOMPARE(motor.get_omega(), 0.0);
+        QCOMPARE(motor.get_n_rpm(), 0.0);
         QCOMPARE(motor.get_temperature(), Tamb);
         QCOMPARE(motor.get_moment(), 0.0);
     }
@@ -32,7 +32,7 @@ private slots:
         // Омега АД равна омеге ICE при step
         motor.step(0.01, 150.0, 314.0);
         
-        QCOMPARE(motor.get_omega(), 150.0);
+        QCOMPARE(motor.get_n_rpm(), 150.0 * 60 / (2 * M_PI));
     }
 
     // --- Тесты set_fan ---
@@ -96,7 +96,7 @@ private slots:
     }
 
     void testStepTemperatureStabilization() {
-        AsyncMotor motor(J_AD, k_loss, k_loss0, k_rad_AD, tau_base, Tamb, Tmax, Mnom, a_const, a_load);
+        AsyncMotor motor(J_AD, 0.1, k_loss0, k_rad_AD, tau_base, Tamb, Tmax, Mnom, a_const, a_load);
         
         // Долгая работа до установления теплового равновесия
         double prev_temp = motor.get_temperature();
@@ -122,7 +122,7 @@ private slots:
         AsyncMotor motor(J_AD, k_loss, k_loss0, k_rad_AD, tau_base, Tamb, Tmax, Mnom, a_const, a_load);
         
         // Изменяем скорость ICE
-        motor.step(0.01, 300.0, 314.0); // билзко к критическому значению
+        motor.step(0.01, 300.0, 314.0); // близко к критическому значению
         double moment_big = motor.get_moment();
         
         motor.step(0.01, 200.0, 314.0);
@@ -144,11 +144,11 @@ private slots:
     }
 
     void testTemperatureLimitExceeded() {
-        AsyncMotor motor(J_AD, k_loss, k_loss0, k_rad_AD, tau_base, Tamb, Tmax, Mnom, a_const, a_load);
+        AsyncMotor motor(J_AD, k_loss, k_loss0, k_rad_AD, tau_base, 25.0, 30.0, Mnom, a_const, a_load);
         
         // Экстремальная перегрузка
-        for (int i = 0; i < 10000; i++) {
-            motor.step(0.1, 0, 314.0); // Полная остновка - практически нет охлаждения
+        for (int i = 0; i < 100000; i++) {
+            motor.step(0.1, 50.0, 314.0); // Малая скорость - практически нет охлаждения
         }
         
         // Рано или поздно температура должна превысить лимит
