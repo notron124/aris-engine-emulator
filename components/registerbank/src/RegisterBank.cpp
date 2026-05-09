@@ -6,7 +6,7 @@ namespace emulator::registerbank {
 	ClientInputSnapshot RegisterBank::RegBankSendInfo() {
 		ClientInputSnapshot clientSnapshot;
 		ModelInputs registerBankStoredInputs;
-		SimulationLimits limits;
+        Limits limits;
 
 		limits.T_cool_max = holdingRegToDouble(T_cool_max);
 		limits.P_oil_min = holdingRegToDouble(P_oil_min);

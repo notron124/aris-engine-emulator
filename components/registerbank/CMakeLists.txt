@@ -21,11 +21,7 @@ target_include_directories(register-bank
 
 target_link_libraries(register-bank
   PUBLIC
-      Qt${QT_VERSION_MAJOR}::Core
-      # Qt${QT_VERSION_MAJOR}::Network
-  PRIVATE
-      # Qt${QT_VERSION_MAJOR}::SerialBus
-      Emulator::Simulation::Exchange
+    Emulator::Simulation::Contracts
 )
 
 if(BUILD_TESTS)

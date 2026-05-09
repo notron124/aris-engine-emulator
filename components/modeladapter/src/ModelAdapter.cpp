@@ -196,7 +196,7 @@ bool ModelBase::reset() {
     return true;
 }
 
-bool ModelAdapter::setInputs(const ModelInputs& inputs) {
+bool ModelBase::setInputs(const ModelInputs& inputs) {
     state.throttle = inputs.throttle_position;
     state.stator_freq_hz = inputs.stator_frequency_hz;
     state.target_torque = inputs.target_brake_torque_nm;

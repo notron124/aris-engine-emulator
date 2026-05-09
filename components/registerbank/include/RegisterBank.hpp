@@ -8,7 +8,7 @@
 #include <optional>
 #include <chrono>
 
-#include "simulation/exchange/SimulationSnapshotExchange.hpp"
+#include "simulation/contracts/ExchangeContract.hpp"
 
 namespace emulator::registerbank {
 
