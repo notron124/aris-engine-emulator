@@ -34,8 +34,8 @@ public:
         SimulationConfig config,
         SimulationController::ClockFn clock);
 
-    [[nodiscard]] std::optional<ModelOutputSnapshot> processSnapshot(
-        const ClientInputSnapshot& inputSnapshot) override;
+    [[nodiscard]] std::optional<exchange::ModelOutputSnapshot> processSnapshot(
+        const exchange::ClientInputSnapshot& inputSnapshot) override;
 
 private:
     using TimePoint = SimulationController::TimePoint;
@@ -45,8 +45,8 @@ private:
      *
      * @param snapshotTime Время получения снимка.
      */
-    [[nodiscard]] std::optional<ModelOutputSnapshot> applyInputCommand(
-        const ClientInputSnapshot& inputSnapshot,
+    [[nodiscard]] std::optional<exchange::ModelOutputSnapshot> applyInputCommand(
+        const exchange::ClientInputSnapshot& inputSnapshot,
         TimePoint snapshotTime);
 
     /**
@@ -55,8 +55,8 @@ private:
      * @param stepWidth Интервал обсчёта модели. Разбивается на внутренние шаги
      * SimulationConfig::integrationStep.
      */
-    [[nodiscard]] std::optional<ModelOutputSnapshot> stepAndRead(
-        const ClientInputSnapshot& inputSnapshot,
+    [[nodiscard]] std::optional<exchange::ModelOutputSnapshot> stepAndRead(
+        const exchange::ClientInputSnapshot& inputSnapshot,
         std::chrono::milliseconds stepWidth);
 
     /**

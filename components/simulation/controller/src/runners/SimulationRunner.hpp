@@ -35,8 +35,8 @@ public:
      * @return Выходной снимок, если после обработки есть данные для публикации;
      * std::nullopt, если публикация не требуется.
      */
-    [[nodiscard]] virtual std::optional<ModelOutputSnapshot> processSnapshot(
-        const ClientInputSnapshot& inputSnapshot) = 0;
+    [[nodiscard]] virtual std::optional<exchange::ModelOutputSnapshot> processSnapshot(
+        const exchange::ClientInputSnapshot& inputSnapshot) = 0;
 
     /**
      * @brief Возвращает текущее состояние симуляции внутри стратегии.
@@ -57,7 +57,7 @@ public:
     /**
      * @brief Возвращает последний сформированный выходной снимок, если он есть.
      */
-    [[nodiscard]] virtual std::optional<ModelOutputSnapshot> lastOutputSnapshot() const = 0;
+    [[nodiscard]] virtual std::optional<exchange::ModelOutputSnapshot> lastOutputSnapshot() const = 0;
 };
 
 /**
@@ -86,7 +86,7 @@ public:
     [[nodiscard]] SimulationState state() const override;
     [[nodiscard]] bool isRunning() const override;
     [[nodiscard]] std::chrono::milliseconds modelTime() const override;
-    [[nodiscard]] std::optional<ModelOutputSnapshot> lastOutputSnapshot() const override;
+    [[nodiscard]] std::optional<exchange::ModelOutputSnapshot> lastOutputSnapshot() const override;
 
 protected:
     /**
@@ -104,26 +104,26 @@ protected:
      * снимок состояния. Специфичные действия стратегии, например запуск
      * worker-потока или отметка времени, выполняются в наследнике.
      */
-    [[nodiscard]] std::optional<ModelOutputSnapshot> startModel(
-        const ClientInputSnapshot& inputSnapshot);
+    [[nodiscard]] std::optional<exchange::ModelOutputSnapshot> startModel(
+        const exchange::ClientInputSnapshot& inputSnapshot);
 
     /**
      * @brief Обрабатывает общую часть команды SimulationCommand::Stop.
      */
-    [[nodiscard]] std::optional<ModelOutputSnapshot> stopModel(
-        const ClientInputSnapshot& inputSnapshot);
+    [[nodiscard]] std::optional<exchange::ModelOutputSnapshot> stopModel(
+        const exchange::ClientInputSnapshot& inputSnapshot);
 
     /**
      * @brief Обрабатывает общую часть команды SimulationCommand::Reset.
      */
-    [[nodiscard]] std::optional<ModelOutputSnapshot> resetModelAndMakeSnapshot(
-        const ClientInputSnapshot& inputSnapshot);
+    [[nodiscard]] std::optional<exchange::ModelOutputSnapshot> resetModelAndMakeSnapshot(
+        const exchange::ClientInputSnapshot& inputSnapshot);
 
     /**
      * @brief Обрабатывает общую часть команды SimulationCommand::EmergencyStop.
      */
-    [[nodiscard]] std::optional<ModelOutputSnapshot> emergencyStop(
-        const ClientInputSnapshot& inputSnapshot);
+    [[nodiscard]] std::optional<exchange::ModelOutputSnapshot> emergencyStop(
+        const exchange::ClientInputSnapshot& inputSnapshot);
 
     /**
      * @brief Формирует fault-диагностику для внутренних ошибок runner/model API.
@@ -163,8 +163,8 @@ protected:
      * @brief Формирует снимок текущего состояния без продвижения модельного
      * времени.
      */
-    [[nodiscard]] std::optional<ModelOutputSnapshot> readCurrentState(
-        const ClientInputSnapshot& inputSnapshot);
+    [[nodiscard]] std::optional<exchange::ModelOutputSnapshot> readCurrentState(
+        const exchange::ClientInputSnapshot& inputSnapshot);
 
     /**
      * @brief Создаёт ModelOutputSnapshot с новой ревизией.
@@ -172,7 +172,7 @@ protected:
      * Метод не сохраняет снимок как последний. Для этого вызывается
      * recordSnapshot(...).
      */
-    [[nodiscard]] ModelOutputSnapshot makeOutputSnapshot(
+    [[nodiscard]] exchange::ModelOutputSnapshot makeOutputSnapshot(
         std::uint64_t sourceInputRevision,
         std::optional<ModelOutputs> outputs,
         const DiagnosticsSnapshot& diagnostics,
@@ -196,13 +196,13 @@ protected:
     /**
      * @brief Запоминает новые входы модели из снимка, если они переданы.
      */
-    void rememberInputs(const ClientInputSnapshot& inputSnapshot);
+    void rememberInputs(const exchange::ClientInputSnapshot& inputSnapshot);
 
     /**
      * @brief Сохраняет последний выходной снимок и испускает
      * SimulationController::sig_outputProduced.
      */
-    void recordSnapshot(const ModelOutputSnapshot& snapshot);
+    void recordSnapshot(const exchange::ModelOutputSnapshot& snapshot);
 
     /**
      * @brief Переводит симуляцию в SimulationState::Fault и испускает
@@ -242,7 +242,7 @@ protected:
     std::optional<ModelOutputs> lastModelOutputs_;
     DiagnosticsSnapshot lastFaultDiagnostics_;
     RuntimeDiagnostics lastRuntimeDiagnostics_;
-    std::optional<ModelOutputSnapshot> lastProducedSnapshot_;
+    std::optional<exchange::ModelOutputSnapshot> lastProducedSnapshot_;
 };
 
 } // namespace emulator::simulation::detail

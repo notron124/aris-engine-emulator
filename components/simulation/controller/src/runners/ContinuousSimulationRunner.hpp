@@ -39,19 +39,19 @@ public:
      */
     ~ContinuousSimulationRunner() override;
 
-    [[nodiscard]] std::optional<ModelOutputSnapshot> processSnapshot(
-        const ClientInputSnapshot& inputSnapshot) override;
+    [[nodiscard]] std::optional<exchange::ModelOutputSnapshot> processSnapshot(
+        const exchange::ClientInputSnapshot& inputSnapshot) override;
     [[nodiscard]] SimulationState state() const override;
     [[nodiscard]] bool isRunning() const override;
     [[nodiscard]] std::chrono::milliseconds modelTime() const override;
-    [[nodiscard]] std::optional<ModelOutputSnapshot> lastOutputSnapshot() const override;
+    [[nodiscard]] std::optional<exchange::ModelOutputSnapshot> lastOutputSnapshot() const override;
 
 private:
     /**
      * @brief Обрабатывает команду управления из входного снимка.
      */
-    [[nodiscard]] std::optional<ModelOutputSnapshot> applyInputCommand(
-        const ClientInputSnapshot& inputSnapshot);
+    [[nodiscard]] std::optional<exchange::ModelOutputSnapshot> applyInputCommand(
+        const exchange::ClientInputSnapshot& inputSnapshot);
 
     /**
      * @brief Запускает worker-поток, если он ещё не был создан.

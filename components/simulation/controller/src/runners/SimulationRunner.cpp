@@ -31,7 +31,7 @@ std::chrono::milliseconds SimulationRunnerBase::modelTime() const
     return modelTime_;
 }
 
-std::optional<ModelOutputSnapshot> SimulationRunnerBase::lastOutputSnapshot() const
+std::optional<exchange::ModelOutputSnapshot> SimulationRunnerBase::lastOutputSnapshot() const
 {
     return lastProducedSnapshot_;
 }
@@ -46,8 +46,8 @@ SimulationRunnerBase::normalizedIntegrationStep() const
     return std::chrono::milliseconds{1};
 }
 
-std::optional<ModelOutputSnapshot>
-SimulationRunnerBase::startModel(const ClientInputSnapshot& inputSnapshot)
+std::optional<exchange::ModelOutputSnapshot>
+SimulationRunnerBase::startModel(const exchange::ClientInputSnapshot& inputSnapshot)
 {
     if (state_ == SimulationState::Fault) {
         const auto diagnostics = hasLastFaultDiagnostics_
@@ -69,16 +69,16 @@ SimulationRunnerBase::startModel(const ClientInputSnapshot& inputSnapshot)
                               modelAdapter_.diagnostics());
 }
 
-std::optional<ModelOutputSnapshot>
-SimulationRunnerBase::stopModel(const ClientInputSnapshot& inputSnapshot)
+std::optional<exchange::ModelOutputSnapshot>
+SimulationRunnerBase::stopModel(const exchange::ClientInputSnapshot& inputSnapshot)
 {
     setState(SimulationState::Stopped);
     return readCurrentState(inputSnapshot);
 }
 
-std::optional<ModelOutputSnapshot>
+std::optional<exchange::ModelOutputSnapshot>
 SimulationRunnerBase::resetModelAndMakeSnapshot(
-    const ClientInputSnapshot& inputSnapshot)
+    const exchange::ClientInputSnapshot& inputSnapshot)
 {
     if (!resetModel()) {
         const auto diagnostics = hasLastFaultDiagnostics_
@@ -90,8 +90,8 @@ SimulationRunnerBase::resetModelAndMakeSnapshot(
     return makeOutputSnapshot(inputSnapshot.revision, std::nullopt, DiagnosticsSnapshot{});
 }
 
-std::optional<ModelOutputSnapshot>
-SimulationRunnerBase::emergencyStop(const ClientInputSnapshot& inputSnapshot)
+std::optional<exchange::ModelOutputSnapshot>
+SimulationRunnerBase::emergencyStop(const exchange::ClientInputSnapshot& inputSnapshot)
 {
     DiagnosticsSnapshot diagnostics;
     diagnostics.faultCode = SimulationFaultCode::EmergencyStop;
@@ -100,8 +100,8 @@ SimulationRunnerBase::emergencyStop(const ClientInputSnapshot& inputSnapshot)
     return makeOutputSnapshot(inputSnapshot.revision, lastModelOutputs_, diagnostics);
 }
 
-std::optional<ModelOutputSnapshot>
-SimulationRunnerBase::readCurrentState(const ClientInputSnapshot& inputSnapshot)
+std::optional<exchange::ModelOutputSnapshot>
+SimulationRunnerBase::readCurrentState(const exchange::ClientInputSnapshot& inputSnapshot)
 {
     const auto diagnostics = state_ == SimulationState::Fault && hasLastFaultDiagnostics_
         ? lastFaultDiagnostics_
@@ -113,14 +113,14 @@ SimulationRunnerBase::readCurrentState(const ClientInputSnapshot& inputSnapshot)
                               lastRuntimeDiagnostics_);
 }
 
-ModelOutputSnapshot
+exchange::ModelOutputSnapshot
 SimulationRunnerBase::makeOutputSnapshot(
     std::uint64_t sourceInputRevision,
     std::optional<ModelOutputs> outputs,
     const DiagnosticsSnapshot& diagnostics,
     RuntimeDiagnostics runtimeDiagnostics)
 {
-    ModelOutputSnapshot snapshot;
+    exchange::ModelOutputSnapshot snapshot;
     snapshot.revision = ++outputRevision_;
     snapshot.sourceInputRevision = sourceInputRevision;
     snapshot.state = state_;
@@ -280,7 +280,8 @@ bool SimulationRunnerBase::resetModel()
     return true;
 }
 
-void SimulationRunnerBase::rememberInputs(const ClientInputSnapshot& inputSnapshot)
+void SimulationRunnerBase::rememberInputs(
+    const exchange::ClientInputSnapshot& inputSnapshot)
 {
     if (!inputSnapshot.inputs.has_value()) {
         return;
@@ -290,7 +291,8 @@ void SimulationRunnerBase::rememberInputs(const ClientInputSnapshot& inputSnapsh
     hasCurrentInputs_ = true;
 }
 
-void SimulationRunnerBase::recordSnapshot(const ModelOutputSnapshot& snapshot)
+void SimulationRunnerBase::recordSnapshot(
+    const exchange::ModelOutputSnapshot& snapshot)
 {
     lastProducedSnapshot_ = snapshot;
     lastRuntimeDiagnostics_ = snapshot.runtimeDiagnostics;
