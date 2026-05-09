@@ -38,14 +38,14 @@ private slots:
 
     // --- COILS (Read/Write) ---
     void testCoils() {
-        QModbusDataUnit writeUnit(QModbusDataUnit::Coils, 100, 2);
+        QModbusDataUnit writeUnit(QModbusDataUnit::Coils, 0, 2);
         writeUnit.setValues({true, false});
         auto *reply = client->sendWriteRequest(writeUnit, 1);
         waitAndCheck(reply);
 
-        QCOMPARE(bank->readCoils(100, 2), QList<bool>({true, false}));
+        QCOMPARE(bank->readCoils(0, 2), QList<bool>({true, false}));
 
-        QModbusDataUnit readUnit(QModbusDataUnit::Coils, 100, 2);
+        QModbusDataUnit readUnit(QModbusDataUnit::Coils, 0, 2);
         auto *readReply = client->sendReadRequest(readUnit, 1);
         waitAndCheck(readReply);
         QCOMPARE(readReply->result().values()[0], 1);
@@ -54,9 +54,9 @@ private slots:
 
     // --- DISCRETE INPUTS (Read Only) ---
     void testDiscreteInputs() {
-        bank->writeDiscreteInput(5, true);
+        bank->writeDiscreteInput(0, true);
 
-        QModbusDataUnit readUnit(QModbusDataUnit::DiscreteInputs, 5, 1);
+        QModbusDataUnit readUnit(QModbusDataUnit::DiscreteInputs, 0, 1);
         auto *reply = client->sendReadRequest(readUnit, 1);
         waitAndCheck(reply);
 
@@ -77,13 +77,13 @@ private slots:
 
     // --- HOLDING REGISTERS (Read/Write) ---
     void testHoldingRegisters() {
-        QModbusDataUnit writeUnit(QModbusDataUnit::HoldingRegisters, 50, 3);
+        QModbusDataUnit writeUnit(QModbusDataUnit::HoldingRegisters, 0, 3);
         writeUnit.setValues({10, 20, 30});
 
         auto *reply = client->sendWriteRequest(writeUnit, 1);
         waitAndCheck(reply);
 
-        QCOMPARE(bank->readHoldingRegisters(50, 3), QList<uint16_t>({10, 20, 30}));
+        QCOMPARE(bank->readHoldingRegisters(0, 3), QList<uint16_t>({10, 20, 30}));
     }
 
     // --- BOUNDARY TESTS ---
