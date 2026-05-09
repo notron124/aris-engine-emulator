@@ -25,6 +25,7 @@ target_link_libraries(register-bank
       # Qt${QT_VERSION_MAJOR}::Network
   PRIVATE
       # Qt${QT_VERSION_MAJOR}::SerialBus
+      Emulator::Simulation::Exchange
 )
 
 if(BUILD_TESTS)

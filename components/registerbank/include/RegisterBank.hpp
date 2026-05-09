@@ -8,20 +8,20 @@
 #include <optional>
 #include <chrono>
 
-#include "SimulationTypes.hpp"
+#include "simulation/exchange/SimulationSnapshotExchange.hpp"
 
 namespace emulator::registerbank {
 
-    using emulator::simulation::ClientInputSnapshot;
-    using emulator::simulation::ModelInputs;
-    using emulator::simulation::SimulationLimits;
-    using emulator::simulation::ModelOutputSnapshot;
-    using emulator::simulation::ModelOutputs;
+    using emulator::exchange::ClientInputSnapshot;
+    using model::ModelInputs;
+    using model::Limits;
+    using exchange::ModelOutputSnapshot;
+    using model::ModelOutputs;
     using emulator::simulation::SimulationCommand;
     using emulator::simulation::SimulationRequest;
     using emulator::simulation::SimulationMode;
     using emulator::simulation::SimulationState;
-    using emulator::simulation::SimulationFaultCode;
+    using simulation::diagnostics::SimulationFaultCode;
 
     class RegisterBank{
     public:
