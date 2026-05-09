@@ -1,8 +1,6 @@
 #ifndef SIMULATIONDOMAIN_HPP
 #define SIMULATIONDOMAIN_HPP
 
-#include "simulation/contracts/SimulationDiagnostics.hpp"
-
 #include <chrono>
 #include <cstdint>
 

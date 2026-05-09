@@ -19,6 +19,7 @@ qt_standard_project_setup()
 add_subdirectory(components/modbus)
 add_subdirectory(components/registerbank)
 add_subdirectory(components/simulation)
+add_subdirectory(components/simple-models)
 add_subdirectory(components/modeladapter)
 
 add_executable(aris-engine
@@ -29,7 +30,9 @@ target_link_libraries(aris-engine
     PRIVATE
         register-bank
         modbus-server
-        simulation-controller
+        Emulator::Model::Adapter
+        Emulator::Simulation::Controller
+        Emulator::Simulation::Exchange
 )
 
 # ==============================================================================

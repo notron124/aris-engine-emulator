@@ -1,7 +1,7 @@
 #ifndef SIMULATIONSNAPSHOTEXCHANGE_HPP
 #define SIMULATIONSNAPSHOTEXCHANGE_HPP
 
-#include "simulation/controller/SimulationTypes.hpp"
+#include "simulation/contracts/ExchangeContract.hpp"
 
 namespace emulator::simulation {
 
