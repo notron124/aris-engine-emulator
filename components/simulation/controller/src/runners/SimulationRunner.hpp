@@ -135,6 +135,16 @@ protected:
         const QString& message) const;
 
     /**
+     * @brief Проверяет диагностику модели и преобразует её в fault слоя
+     * simulation.
+     *
+     * ModelAdapter возвращает ModelDiagnosticsSnapshot, но наружу из
+     * SimulationController публикуется только SimulationDiagnosticsSnapshot.
+     */
+    [[nodiscard]] std::optional<DiagnosticsSnapshot> modelFaultDiagnostics(
+        const QString& fallbackMessage) const;
+
+    /**
      * @brief Проверяет выходы модели на превышение лимитов симуляции.
      *
      * Возвращает доменную runtime-диагностику без изменения состояния

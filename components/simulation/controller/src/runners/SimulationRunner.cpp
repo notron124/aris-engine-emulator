@@ -66,7 +66,7 @@ SimulationRunnerBase::startModel(const exchange::ClientInputSnapshot& inputSnaps
     setState(SimulationState::Running);
     return makeOutputSnapshot(inputSnapshot.revision,
                               std::nullopt,
-                              modelAdapter_.diagnostics());
+                              DiagnosticsSnapshot{});
 }
 
 std::optional<exchange::ModelOutputSnapshot>
@@ -103,9 +103,14 @@ SimulationRunnerBase::emergencyStop(const exchange::ClientInputSnapshot& inputSn
 std::optional<exchange::ModelOutputSnapshot>
 SimulationRunnerBase::readCurrentState(const exchange::ClientInputSnapshot& inputSnapshot)
 {
-    const auto diagnostics = state_ == SimulationState::Fault && hasLastFaultDiagnostics_
-        ? lastFaultDiagnostics_
-        : (adapterInitialized_ ? modelAdapter_.diagnostics() : DiagnosticsSnapshot{});
+    DiagnosticsSnapshot diagnostics;
+    if (state_ == SimulationState::Fault && hasLastFaultDiagnostics_) {
+        diagnostics = lastFaultDiagnostics_;
+    } else if (const auto modelFault =
+                   modelFaultDiagnostics(QStringLiteral("Model adapter reported fault"))) {
+        diagnostics = *modelFault;
+        enterFault(diagnostics);
+    }
 
     return makeOutputSnapshot(inputSnapshot.revision,
                               lastModelOutputs_,
@@ -136,13 +141,34 @@ DiagnosticsSnapshot
 SimulationRunnerBase::failureDiagnostics(
     const QString& message) const
 {
-    auto diagnostics =
-        adapterInitialized_ ? modelAdapter_.diagnostics() : DiagnosticsSnapshot{};
-    if (!diagnostics.hasFault()) {
-        diagnostics.faultCode = SimulationFaultCode::InternalError;
-        diagnostics.message = message;
+    if (const auto modelFault = modelFaultDiagnostics(message)) {
+        return *modelFault;
     }
 
+    DiagnosticsSnapshot diagnostics;
+    diagnostics.faultCode = SimulationFaultCode::InternalError;
+    diagnostics.message = message;
+    return diagnostics;
+}
+
+std::optional<DiagnosticsSnapshot>
+SimulationRunnerBase::modelFaultDiagnostics(
+    const QString& fallbackMessage) const
+{
+    if (!adapterInitialized_) {
+        return std::nullopt;
+    }
+
+    const auto modelDiagnostics = modelAdapter_.diagnostics();
+    if (!modelDiagnostics.hasFault()) {
+        return std::nullopt;
+    }
+
+    DiagnosticsSnapshot diagnostics;
+    diagnostics.faultCode = SimulationFaultCode::ModelAdapterFault;
+    diagnostics.message = modelDiagnostics.message.isEmpty()
+        ? fallbackMessage
+        : modelDiagnostics.message;
     return diagnostics;
 }
 
@@ -258,6 +284,12 @@ bool SimulationRunnerBase::ensureInitialized()
     }
 
     adapterInitialized_ = true;
+    if (const auto modelFault =
+            modelFaultDiagnostics(QStringLiteral("Model adapter reported fault after initialization"))) {
+        enterFault(*modelFault);
+        return false;
+    }
+
     return true;
 }
 

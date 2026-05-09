@@ -158,12 +158,12 @@ StepOnDemandSimulationRunner::stepAndRead(
     const auto runtimeDiagnostics =
         runtimeDiagnosticsForOutputs(outputs, currentInputs_.limits);
 
-    const auto diagnostics = modelAdapter_.diagnostics();
-    if (diagnostics.hasFault()) {
-        enterFault(diagnostics);
+    if (const auto diagnostics =
+            modelFaultDiagnostics(QStringLiteral("Model adapter reported fault after step"))) {
+        enterFault(*diagnostics);
         return makeOutputSnapshot(inputSnapshot.revision,
                                   outputs,
-                                  diagnostics,
+                                  *diagnostics,
                                   runtimeDiagnostics);
     }
 
@@ -179,7 +179,7 @@ StepOnDemandSimulationRunner::stepAndRead(
 
     return makeOutputSnapshot(inputSnapshot.revision,
                               outputs,
-                              diagnostics,
+                              DiagnosticsSnapshot{},
                               runtimeDiagnostics);
 }
 

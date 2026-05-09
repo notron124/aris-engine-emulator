@@ -217,12 +217,12 @@ ContinuousSimulationRunner::workerLoop()
                 currentInputs_.limits);
             lastRuntimeDiagnostics_ = runtimeDiagnostics;
 
-            const auto diagnostics = modelAdapter_.diagnostics();
-            if (diagnostics.hasFault()) {
-                enterFault(diagnostics);
+            if (const auto diagnostics =
+                    modelFaultDiagnostics(QStringLiteral("Model adapter reported fault after step"))) {
+                enterFault(*diagnostics);
                 recordSnapshot(makeOutputSnapshot(lastInputRevision_,
                                                   outputs,
-                                                  diagnostics,
+                                                  *diagnostics,
                                                   runtimeDiagnostics));
                 continue;
             }
