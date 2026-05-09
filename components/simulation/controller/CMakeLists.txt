@@ -22,7 +22,7 @@ target_include_directories(simulation-controller
 
 target_link_libraries(simulation-controller
   PUBLIC
-    Emulator::Simulation::Units
+    Emulator::Simulation::Contracts
   PRIVATE
     Emulator::Model::Adapter # использует модель, но не рассказывает о ней всем
 )
