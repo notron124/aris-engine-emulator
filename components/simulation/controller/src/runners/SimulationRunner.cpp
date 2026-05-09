@@ -149,7 +149,7 @@ SimulationRunnerBase::failureDiagnostics(
 RuntimeDiagnostics
 SimulationRunnerBase::runtimeDiagnosticsForOutputs(
     const ModelOutputs& outputs,
-    const SimulationLimits& limits) const
+    const Limits &limits) const
 {
     RuntimeDiagnostics diagnostics;
     const auto appendViolation = [&diagnostics](

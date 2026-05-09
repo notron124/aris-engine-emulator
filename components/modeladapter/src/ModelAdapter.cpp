@@ -2,7 +2,7 @@
 #include <cmath>
 #include <algorithm>
 
-namespace emulator::simulation::model {
+namespace emulator::model {
 
 // ============================================================================
 // Параметры модели 
@@ -74,7 +74,7 @@ static double calculateDriveTorque() {
 
 static double calculateFrictionTorque() {
     // Внутреннее трение ДВС
-    double rpm = state.omega_ice * 60.0 / (2.0 * M_PI);
+    double rpm = state.omega_ICE * 60.0 / (2.0 * M_PI);
     return 50.0 + 0.1 * rpm;  // Н·м
 }
 
@@ -95,8 +95,8 @@ static double calculateFlowFactorBallast() {
 }
 
 static void checkEmergencyLimits() {
-    double rpm = state.omega_ice * 60.0 / (2.0 * M_PI);
-    
+    double rpm = state.omega_ICE * 60.0 / (2.0 * M_PI);
+
     if (state.T_cool >= state.t_cool_max) {
         state.emergency_flag = true;
         state.emergency_code = 1;  // Перегрев ОЖ
@@ -135,21 +135,21 @@ static void solveMechanics(double dt) {
     double M_load = state.M_ad;
     
     double domega_dt = (M_drive - M_friction - M_load) / J_ICE_;
-    state.omega_ice += domega_dt * dt;
-    
-    if (state.omega_ice < 0.0) state.omega_ice = 0.0;
-    
+    state.omega_ICE += domega_dt * dt;
+
+    if (state.omega_ICE < 0.0) state.omega_ICE = 0.0;
+
     state.M_ad = state.target_torque;
 }
 
 static void updateThermal(double dt) {
-    double P_ICE = calculateDriveTorque() * state.omega_ice;
-    double omega_AD = state.omega_ice;
+    double P_ICE = calculateDriveTorque() * state.omega_ICE;
+    double omega_AD = state.omega_ICE;
     double P_loss_AD = k_loss_AD_ * std::abs(state.M_ad) * omega_AD + k_loss0_AD_;
     
     double omega_sync = 2.0 * M_PI * state.stator_freq_hz / 2.0;
-    state.P_ballast = std::max(0.0, state.M_ad * (state.omega_ice - omega_sync));
-    
+    state.P_ballast = std::max(0.0, state.M_ad * (state.omega_ICE - omega_sync));
+
     // ОЖ
     double P_heat_cool = k_heat_ * P_ICE;
     double T_steady_cool = T_amb_ + P_heat_cool / k_radiator_;
@@ -171,7 +171,7 @@ static void updateThermal(double dt) {
 }
 
 static void calculateOilPressure() {
-    double rpm = state.omega_ice * 60.0 / (2.0 * M_PI);
+    double rpm = state.omega_ICE * 60.0 / (2.0 * M_PI);
     double p_base = 1.0 + rpm / 500.0;
     double temp_factor = 1.0 - 0.005 * (state.T_cool - 80.0);
     temp_factor = std::max(0.5, std::min(1.2, temp_factor));
@@ -183,14 +183,14 @@ static void calculateOilPressure() {
 // Публичные методы ModelAdapter
 // ============================================================================
 
-bool ModelAdapter::initialize() {
+bool ModelBase::initialize() {
     // Сброс всех параметров в начальные значения
     state = ModelState{};
     state.is_running = true;
     return true;
 }
 
-bool ModelAdapter::reset() {
+bool ModelBase::reset() {
     state = ModelState{};
     state.is_running = true;
     return true;
@@ -200,15 +200,15 @@ bool ModelAdapter::setInputs(const ModelInputs& inputs) {
     state.throttle = inputs.throttle_position;
     state.stator_freq_hz = inputs.stator_frequency_hz;
     state.target_torque = inputs.target_brake_torque_nm;
-    state.fan_ad_enabled = inputs.fan_ad_enabled;
+    state.fan_ad_enabled = inputs.fan_AD_enabled;
     state.fan_ballast_enabled = inputs.fan_ballast_enabled;
     
-    state.t_cool_max = inputs.t_cool_max;
-    state.t_ad_max = inputs.t_ad_max;
-    state.t_ballast_max = inputs.t_ballast_max;
-    state.p_oil_min = inputs.p_oil_min;
-    state.p_oil_max = inputs.p_oil_max;
-    state.rpm_max_current = std::min(inputs.rpm_max_lapping, inputs.rpm_max_run);
+    state.t_cool_max = inputs.limits.T_cool_max;
+    state.t_ad_max = inputs.limits.T_AD_max;
+    state.t_ballast_max = inputs.limits.T_ballast_max;
+    state.p_oil_min = inputs.limits.P_oil_min;
+    state.p_oil_max = inputs.limits.P_oil_max;
+    state.rpm_max_current = std::min(inputs.limits.rpm_max_lapping, inputs.limits.rpm_max_run);
     
     if (inputs.emergency_stop_requested) {
         state.emergency_flag = true;
@@ -219,7 +219,7 @@ bool ModelAdapter::setInputs(const ModelInputs& inputs) {
     return true;
 }
 
-bool ModelAdapter::step(std::chrono::milliseconds modelTime, std::chrono::milliseconds dt) {
+bool ModelBase::step(std::chrono::milliseconds modelTime, std::chrono::milliseconds dt) {
     if (!state.is_running || state.emergency_flag) return false;
     
     double dt_sec = dt.count() / 1000.0;
@@ -235,9 +235,9 @@ bool ModelAdapter::step(std::chrono::milliseconds modelTime, std::chrono::millis
     return !state.emergency_flag;
 }
 
-ModelOutputs ModelAdapter::readOutputs() const {
+ModelOutputs ModelBase::readOutputs() const {
     ModelOutputs outputs;
-    outputs.ice_rpm = state.omega_ice * 60.0 / (2.0 * M_PI); // перевод в об./мин.
+    outputs.ice_rpm = state.omega_ICE * 60.0 / (2.0 * M_PI); // перевод в об./мин.
     outputs.t_cool_c = state.T_cool;
     outputs.t_ad_c = state.T_ad;
     outputs.t_ballast_c = state.T_ballast;
@@ -246,34 +246,38 @@ ModelOutputs ModelAdapter::readOutputs() const {
     return outputs;
 }
 
-bool ModelAdapter::isRunning() const {
+bool ModelBase::isRunning() const {
     return state.is_running;
 }
 
-bool ModelAdapter::isEmergency() const {
+bool ModelBase::isEmergency() const {
     return state.emergency_flag;
 }
 
-DiagnosticsSnapshot ModelAdapter::diagnostics() const {
-    DiagnosticsSnapshot snap;
-    snap.is_running = state.is_running;
-    snap.is_emergency = state.emergency_flag;
-    snap.emergency_code = state.emergency_code;
-    snap.current_time_s = state.current_time;
+diagnostics::ModelDiagnosticsSnapshot ModelBase::diagnostics() const {
+    diagnostics::ModelDiagnosticsSnapshot snap;
+    // snap.is_running = state.is_running;
+    // snap.is_emergency = state.emergency_flag;
+    // snap.emergency_code = state.emergency_code;
+    // snap.current_time_s = state.current_time;
     
-    auto outputs = readOutputs();
-    snap.ice_rpm = outputs.ice_rpm;
-    snap.t_cool_c = outputs.t_cool_c;
-    snap.t_ad_c = outputs.t_ad_c;
-    snap.t_ballast_c = outputs.t_ballast_c;
-    snap.p_oil_bar = outputs.p_oil_bar;
-    snap.m_ad_nm = outputs.m_ad_nm;
+    // auto outputs = readOutputs();
+    // snap.ice_rpm = outputs.ice_rpm;
+    // snap.t_cool_c = outputs.t_cool_c;
+    // snap.t_ad_c = outputs.t_ad_c;
+    // snap.t_ballast_c = outputs.t_ballast_c;
+    // snap.p_oil_bar = outputs.p_oil_bar;
+    // snap.m_ad_nm = outputs.m_ad_nm;
     
-    snap.throttle_position = state.throttle;
-    snap.stator_frequency_hz = state.stator_freq_hz;
-    snap.fan_ad_enabled = state.fan_ad_enabled;
-    snap.fan_ballast_enabled = state.fan_ballast_enabled;
+    // snap.throttle_position = state.throttle;
+    // snap.stator_frequency_hz = state.stator_freq_hz;
+    // snap.fan_ad_enabled = state.fan_ad_enabled;
+    // snap.fan_ballast_enabled = state.fan_ballast_enabled;
     
+    if (state.emergency_flag) {
+        snap.faultCode = diagnostics::ModelFaultCode::Emergency;
+        snap.message = QStringLiteral("Model emergency code %1").arg(state.emergency_code);
+    }
     return snap;
 }
 

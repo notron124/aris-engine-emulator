@@ -1,28 +1,57 @@
 #ifndef MODELADAPTER_HPP
 #define MODELADAPTER_HPP
 
-#include "SimulationTypes.hpp"
+#include "simulation/contracts/ModelContract.hpp"
 #include <chrono>
 
-namespace emulator::simulation::model {
+namespace emulator::model {
 
 class ModelAdapter {
 public:
-    ~ModelAdapter() = default;
+    virtual ~ModelAdapter() = default;
     
-    // Жизненный цикл
-    bool initialize();
-    bool reset();
+    /// @name Жизненный цикл
+    /// @{
+    virtual bool initialize() = 0;
+    virtual bool reset() = 0;
+    /// @}
     
-    // Управление
-    bool setInputs(const ModelInputs& inputs);
-    bool step(std::chrono::milliseconds modelTime, std::chrono::milliseconds dt);
+    /// @name Управление
+    /// @{
+    virtual bool setInputs(const ModelInputs& inputs) = 0;
+    virtual bool step(
+        std::chrono::milliseconds modelTime,
+        std::chrono::milliseconds dt) = 0;
+    /// @}
     
-    // Данные
-    [[nodiscard]] ModelOutputs readOutputs() const;
-    [[nodiscard]] bool isRunning() const;        // проверка на остановку пользователем
-    [[nodiscard]] bool isEmergency() const;      // Быстрая проверка: авария?
-    [[nodiscard]] DiagnosticsSnapshot diagnostics() const;
+    /// @name Данные
+    /// @{
+    [[nodiscard]] virtual ModelOutputs readOutputs() const = 0;
+    [[nodiscard]] virtual diagnostics::ModelDiagnosticsSnapshot diagnostics() const = 0;
+    //Лучше через контрактный код (пример enum)
+    //[[nodiscard]] virtual ModelStateCode state() const = 0;
+    [[nodiscard]] virtual bool isRunning() const = 0;
+    [[nodiscard]] virtual bool isEmergency() const = 0;
+    /// @}
+};
+
+class ModelBase : public ModelAdapter {
+public:
+    ModelBase() = default;
+    ~ModelBase() override = default;
+
+    bool initialize() override;
+    bool reset() override;
+
+    virtual bool setInputs(const ModelInputs& inputs) override;
+    virtual bool step(
+        std::chrono::milliseconds modelTime,
+        std::chrono::milliseconds dt) override;
+
+    [[nodiscard]] virtual ModelOutputs readOutputs() const override;
+    [[nodiscard]] virtual diagnostics::ModelDiagnosticsSnapshot diagnostics() const override;
+    [[nodiscard]] bool isRunning() const override;
+    [[nodiscard]] bool isEmergency() const override;
 };
 
 } 

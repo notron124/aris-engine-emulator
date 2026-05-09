@@ -3,6 +3,8 @@ add_library(modeladapter
   include/ModelAdapter.hpp
 )
 
+add_library(Emulator::Model::Adapter ALIAS modeladapter)
+
 target_include_directories(modeladapter
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -11,9 +13,10 @@ target_include_directories(modeladapter
 )
 
 target_link_libraries(modeladapter
-      simple-models
-      simulation-controller
-      # Qt${QT_VERSION_MAJOR}::Core
+  PUBLIC
+    Emulator::Simulation::Contracts
+  PRIVATE
+    simple-models
 )
 
 if(BUILD_TESTING)

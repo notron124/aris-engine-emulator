@@ -13,7 +13,7 @@ namespace simulation_diagnostics = ::emulator::simulation::diagnostics;
 
 using ::emulator::model::ModelInputs;
 using ::emulator::model::ModelOutputs;
-using ::emulator::model::SimulationLimits;
+using ::emulator::model::Limits;
 using ::emulator::model::defaultLimits;
 
 using DiagnosticsSnapshot =

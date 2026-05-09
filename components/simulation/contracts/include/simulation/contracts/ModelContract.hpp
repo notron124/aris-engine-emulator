@@ -6,7 +6,34 @@
 
 namespace emulator::model {
 
-struct SimulationLimits {
+enum class ModelStateCode : std::uint8_t {
+    /**
+     * Модель ещё не инициализирована.
+     */
+    Uninitialized,
+
+    /**
+     * Модель инициализирована и готова к запуску.
+     */
+    Ready,
+
+    /**
+     * Модель выполняет расчёт или находится в активном расчётном состоянии.
+     */
+    Running,
+
+    /**
+     * Модель штатно остановлена.
+     */
+    Stopped,
+
+    /**
+     * Модель сообщила внутреннюю ошибку или аварийное состояние.
+     */
+    Fault
+};
+
+struct Limits {
     /// Верхний предел температуры охлаждающей жидкости ДВС.
     double T_cool_max = 105.0;
     /// Нижний предел давления масла ДВС.
@@ -21,6 +48,9 @@ struct SimulationLimits {
     double T_AD_max = 140.0;
     /// Верхний предел температуры балласта.
     double T_ballast_max = 250.0;
+
+    /// @todo Добавлено исключительно для обеспечения совместимости, исправить.
+    double rpm_max_lapping, rpm_max_run;
 };
 
 /**
@@ -28,7 +58,7 @@ struct SimulationLimits {
  *
  * Используется, когда backend не передал отдельные лимиты во входном снимке.
  */
-inline constexpr SimulationLimits defaultLimits {
+inline constexpr Limits defaultLimits {
     105.0,
     1.5,
     7.0,
@@ -52,7 +82,13 @@ struct ModelInputs {
     bool fan_AD_enabled         = true;
     bool fan_ballast_enabled    = true;
 
-    SimulationLimits limits = defaultLimits;
+    Limits limits = defaultLimits;
+
+    /// @todo Добавлено исключительно для обеспечения совместимости, исправить.
+    double throttle_position, stator_frequency_hz, target_brake_torque_nm, t_cool_max, t_ad_max, t_ballast_max, p_oil_min;
+
+    /// @todo Определить механизм аварийного завершения модели.
+    bool emergency_stop_requested;
 };
 
 /**
@@ -67,6 +103,9 @@ struct ModelOutputs {
     double T_ballast            = 0.0;
     double M_AD                 = 0.0;
     double f_AD                 = 0.0;
+
+    /// @todo Добавлено исключительно для обеспечения совместимости, исправить.
+    double ice_rpm, t_cool_c, t_ad_c, t_ballast_c, p_oil_bar, m_ad_nm;
 };
 
 } // namespace emulator::model

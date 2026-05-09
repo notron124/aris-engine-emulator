@@ -142,7 +142,7 @@ protected:
      */
     [[nodiscard]] RuntimeDiagnostics runtimeDiagnosticsForOutputs(
         const ModelOutputs& outputs,
-        const SimulationLimits& limits) const;
+        const Limits& limits) const;
 
     /**
      * @brief Формирует fault-диагностику из нарушений лимитов.
