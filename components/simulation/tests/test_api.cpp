@@ -5,16 +5,20 @@
 #include <vector>
 
 #include "ModelAdapter.hpp"
-#include "SimulationBackendBridge.hpp"
-#include "SimulationController.hpp"
-#include "SimulationSnapshotExchange.hpp"
+#include "simulation/exchange/SimulationBackendBridge.hpp"
+#include "simulation/controller/SimulationController.hpp"
+#include "simulation/exchange/SimulationSnapshotExchange.hpp"
 
 namespace {
 using namespace emulator::simulation;
+using namespace emulator::model;
+using emulator::exchange::ClientInputSnapshot;
+using emulator::exchange::ModelOutputSnapshot;
 
-constexpr auto ModelFaultCode = SimulationFaultCode::ModelAdapterFault;
+constexpr auto testModelFaultCode =
+    emulator::model::diagnostics::ModelFaultCode::ModelFault;
 
-constexpr SimulationLimits testLimits {
+constexpr Limits testLimits {
     106.0,  // T_cool_max
     1.4,    // P_oil_min
     7.2,    // P_oil_max
@@ -54,7 +58,7 @@ continuousTestConfig()
 
 // Управляемая fake-модель: тесты видят, какие методы вызвал контроллер,
 // и сами задают выходы/диагностику модели.
-class FakeModelAdapter final : public model::ModelAdapter {
+class FakeModelAdapter final : public ModelAdapter {
 public:
     bool initializeResult = true;
     bool resetResult = true;
@@ -73,7 +77,7 @@ public:
     std::vector<std::int64_t> stepModelTimes;
     std::vector<std::int64_t> stepDts;
     ModelOutputs outputs;
-    DiagnosticsSnapshot diagnosticsSnapshot;
+    emulator::model::diagnostics::ModelDiagnosticsSnapshot diagnosticsSnapshot;
 
     bool initialize() override
     {
@@ -110,10 +114,20 @@ public:
         return outputs;
     }
 
-    DiagnosticsSnapshot diagnostics() const override
+    emulator::model::diagnostics::ModelDiagnosticsSnapshot diagnostics() const override
     {
         ++diagnosticsCount;
         return diagnosticsSnapshot;
+    }
+
+    /// @todo Эти методы не используются в тесте
+    bool isRunning() const override
+    {
+        return true;
+    }
+    bool isEmergency() const override
+    {
+        return true;
     }
 };
 
@@ -437,7 +451,7 @@ TestSimulationController::modelFaultPublishesFaultSnapshot()
 
     // Диагностика модели имеет приоритет: если adapter сообщает fault,
     // контроллер переводит симуляцию в Fault и отдаёт fault-снимок наружу
-    model.diagnosticsSnapshot.faultCode = ModelFaultCode;
+    model.diagnosticsSnapshot.faultCode = testModelFaultCode;
     model.diagnosticsSnapshot.message = QStringLiteral("modelFaultPublishesFaultSnapshot");
 
     now += std::chrono::milliseconds{100};
@@ -447,7 +461,7 @@ TestSimulationController::modelFaultPublishesFaultSnapshot()
     QVERIFY(faultSnapshot.has_value());
     QCOMPARE(static_cast<int>(controller.state()), static_cast<int>(SimulationState::Fault));
     QVERIFY(faultSnapshot->diagnostics.hasFault());
-    QCOMPARE(faultSnapshot->diagnostics.faultCode, ModelFaultCode);
+    QCOMPARE(faultSnapshot->diagnostics.faultCode, SimulationFaultCode::ModelAdapterFault);
     QCOMPARE(faultSnapshot->diagnostics.message,
              QStringLiteral("modelFaultPublishesFaultSnapshot"));
     QCOMPARE(faultSpy.count(), 1);
@@ -455,7 +469,7 @@ TestSimulationController::modelFaultPublishesFaultSnapshot()
     const auto arguments = faultSpy.takeFirst();
     const auto diagnostics = arguments.at(0).value<DiagnosticsSnapshot>();
     QVERIFY(diagnostics.hasFault());
-    QCOMPARE(diagnostics.faultCode, ModelFaultCode);
+    QCOMPARE(diagnostics.faultCode, SimulationFaultCode::ModelAdapterFault);
 }
 
 void
