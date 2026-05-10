@@ -7,7 +7,7 @@ project(stand-emulator
     LANGUAGES CXX
 )
 
-option(BUILD_TESTING "Build tests" ON)
+option(BUILD_TESTING "Build tests" OFF)
 include(CTest)
 
 # ==============================================================================

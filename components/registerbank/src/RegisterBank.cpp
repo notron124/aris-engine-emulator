@@ -130,10 +130,6 @@ namespace emulator::registerbank {
 		return true;
     }
 
-    void RegisterBank::writeComplete() {
-        emit sig_inputSnapshotUpdated();
-    }
-
 	bool RegisterBank::doubleToInputReg(uint16_t offset, double data) {
 		memcpy(&inputRegisters_[offset], &data, sizeof(double));
 		return true;

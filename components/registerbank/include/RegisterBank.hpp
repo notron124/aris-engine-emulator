@@ -52,7 +52,6 @@ namespace emulator::registerbank {
         bool writeCoils(uint16_t startAddr, const QList<bool>& values);
         bool writeHoldingRegister(uint16_t addr, uint16_t value);
         bool writeHoldingRegisters(uint16_t startAddr, const QList<uint16_t>& values);
-        void writeComplete();
 
         // InputRegisters offset
         static constexpr uint16_t T_cool = 0;
