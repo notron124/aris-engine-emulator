@@ -110,7 +110,7 @@ namespace emulator::registerbank {
         static constexpr size_t numberOfDiscreteInputs = 3;
         static constexpr size_t numberOfCoils = 3;
         static constexpr size_t numberOfInputRegisters = 50;
-        static constexpr size_t numberOfHoldingRegisters = 44;
+        static constexpr size_t numberOfHoldingRegisters = simulationMode + 1;
 
         bool doubleToInputReg(uint16_t offset, double data);
         double holdingRegToDouble(uint16_t offset);
