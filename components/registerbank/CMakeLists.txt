@@ -9,7 +9,6 @@ add_library(register-bank
   # src/ModbusServer.cpp
   src/RegisterBank.cpp
   include/RegisterBank.hpp
-  # src/ModbusTcpServer.hpp
 )
 
 target_include_directories(register-bank
@@ -21,10 +20,9 @@ target_include_directories(register-bank
 
 target_link_libraries(register-bank
   PUBLIC
-      Qt${QT_VERSION_MAJOR}::Core
-      # Qt${QT_VERSION_MAJOR}::Network
-  PRIVATE
-      # Qt${QT_VERSION_MAJOR}::SerialBus
+
+    Emulator::Simulation::Contracts
+    Emulator::Simulation::Exchange
 )
 
 if(BUILD_TESTS)

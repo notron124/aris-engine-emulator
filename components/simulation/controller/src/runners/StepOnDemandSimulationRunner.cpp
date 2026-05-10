@@ -15,9 +15,9 @@ StepOnDemandSimulationRunner::StepOnDemandSimulationRunner(
 {
 }
 
-std::optional<ModelOutputSnapshot>
+std::optional<exchange::ModelOutputSnapshot>
 StepOnDemandSimulationRunner::processSnapshot(
-    const ClientInputSnapshot& inputSnapshot)
+    const exchange::ClientInputSnapshot& inputSnapshot)
 {
     const auto now = clock_();
     const auto hadInputsBefore = hasCurrentInputs_;
@@ -30,7 +30,8 @@ StepOnDemandSimulationRunner::processSnapshot(
         markStepBoundary(now);
     }
 
-    const auto recordAndReturn = [this](std::optional<ModelOutputSnapshot> snapshot) {
+    const auto recordAndReturn =
+        [this](std::optional<exchange::ModelOutputSnapshot> snapshot) {
         if (snapshot.has_value()) {
             recordSnapshot(*snapshot);
         }
@@ -76,9 +77,9 @@ StepOnDemandSimulationRunner::processSnapshot(
     return std::nullopt;
 }
 
-std::optional<ModelOutputSnapshot>
+std::optional<exchange::ModelOutputSnapshot>
 StepOnDemandSimulationRunner::applyInputCommand(
-    const ClientInputSnapshot& inputSnapshot,
+    const exchange::ClientInputSnapshot& inputSnapshot,
     TimePoint snapshotTime)
 {
     switch (inputSnapshot.command) {
@@ -108,9 +109,9 @@ StepOnDemandSimulationRunner::applyInputCommand(
     return std::nullopt;
 }
 
-std::optional<ModelOutputSnapshot>
+std::optional<exchange::ModelOutputSnapshot>
 StepOnDemandSimulationRunner::stepAndRead(
-    const ClientInputSnapshot& inputSnapshot,
+    const exchange::ClientInputSnapshot& inputSnapshot,
     std::chrono::milliseconds stepWidth)
 {
     if (stepWidth <= std::chrono::milliseconds::zero()) {
@@ -157,12 +158,12 @@ StepOnDemandSimulationRunner::stepAndRead(
     const auto runtimeDiagnostics =
         runtimeDiagnosticsForOutputs(outputs, currentInputs_.limits);
 
-    const auto diagnostics = modelAdapter_.diagnostics();
-    if (diagnostics.hasFault()) {
-        enterFault(diagnostics);
+    if (const auto diagnostics =
+            modelFaultDiagnostics(QStringLiteral("Model adapter reported fault after step"))) {
+        enterFault(*diagnostics);
         return makeOutputSnapshot(inputSnapshot.revision,
                                   outputs,
-                                  diagnostics,
+                                  *diagnostics,
                                   runtimeDiagnostics);
     }
 
@@ -178,7 +179,7 @@ StepOnDemandSimulationRunner::stepAndRead(
 
     return makeOutputSnapshot(inputSnapshot.revision,
                               outputs,
-                              diagnostics,
+                              DiagnosticsSnapshot{},
                               runtimeDiagnostics);
 }
 

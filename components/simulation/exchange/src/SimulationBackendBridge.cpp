@@ -1,7 +1,7 @@
-#include "SimulationBackendBridge.hpp"
+#include "simulation/exchange/SimulationBackendBridge.hpp"
 
-#include "SimulationController.hpp"
-#include "SimulationSnapshotExchange.hpp"
+#include "simulation/controller/SimulationController.hpp"
+#include "simulation/exchange/SimulationSnapshotExchange.hpp"
 
 namespace emulator::simulation {
 

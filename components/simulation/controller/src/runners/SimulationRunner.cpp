@@ -31,7 +31,7 @@ std::chrono::milliseconds SimulationRunnerBase::modelTime() const
     return modelTime_;
 }
 
-std::optional<ModelOutputSnapshot> SimulationRunnerBase::lastOutputSnapshot() const
+std::optional<exchange::ModelOutputSnapshot> SimulationRunnerBase::lastOutputSnapshot() const
 {
     return lastProducedSnapshot_;
 }
@@ -46,8 +46,8 @@ SimulationRunnerBase::normalizedIntegrationStep() const
     return std::chrono::milliseconds{1};
 }
 
-std::optional<ModelOutputSnapshot>
-SimulationRunnerBase::startModel(const ClientInputSnapshot& inputSnapshot)
+std::optional<exchange::ModelOutputSnapshot>
+SimulationRunnerBase::startModel(const exchange::ClientInputSnapshot& inputSnapshot)
 {
     if (state_ == SimulationState::Fault) {
         const auto diagnostics = hasLastFaultDiagnostics_
@@ -66,19 +66,19 @@ SimulationRunnerBase::startModel(const ClientInputSnapshot& inputSnapshot)
     setState(SimulationState::Running);
     return makeOutputSnapshot(inputSnapshot.revision,
                               std::nullopt,
-                              modelAdapter_.diagnostics());
+                              DiagnosticsSnapshot{});
 }
 
-std::optional<ModelOutputSnapshot>
-SimulationRunnerBase::stopModel(const ClientInputSnapshot& inputSnapshot)
+std::optional<exchange::ModelOutputSnapshot>
+SimulationRunnerBase::stopModel(const exchange::ClientInputSnapshot& inputSnapshot)
 {
     setState(SimulationState::Stopped);
     return readCurrentState(inputSnapshot);
 }
 
-std::optional<ModelOutputSnapshot>
+std::optional<exchange::ModelOutputSnapshot>
 SimulationRunnerBase::resetModelAndMakeSnapshot(
-    const ClientInputSnapshot& inputSnapshot)
+    const exchange::ClientInputSnapshot& inputSnapshot)
 {
     if (!resetModel()) {
         const auto diagnostics = hasLastFaultDiagnostics_
@@ -90,8 +90,8 @@ SimulationRunnerBase::resetModelAndMakeSnapshot(
     return makeOutputSnapshot(inputSnapshot.revision, std::nullopt, DiagnosticsSnapshot{});
 }
 
-std::optional<ModelOutputSnapshot>
-SimulationRunnerBase::emergencyStop(const ClientInputSnapshot& inputSnapshot)
+std::optional<exchange::ModelOutputSnapshot>
+SimulationRunnerBase::emergencyStop(const exchange::ClientInputSnapshot& inputSnapshot)
 {
     DiagnosticsSnapshot diagnostics;
     diagnostics.faultCode = SimulationFaultCode::EmergencyStop;
@@ -100,12 +100,17 @@ SimulationRunnerBase::emergencyStop(const ClientInputSnapshot& inputSnapshot)
     return makeOutputSnapshot(inputSnapshot.revision, lastModelOutputs_, diagnostics);
 }
 
-std::optional<ModelOutputSnapshot>
-SimulationRunnerBase::readCurrentState(const ClientInputSnapshot& inputSnapshot)
+std::optional<exchange::ModelOutputSnapshot>
+SimulationRunnerBase::readCurrentState(const exchange::ClientInputSnapshot& inputSnapshot)
 {
-    const auto diagnostics = state_ == SimulationState::Fault && hasLastFaultDiagnostics_
-        ? lastFaultDiagnostics_
-        : (adapterInitialized_ ? modelAdapter_.diagnostics() : DiagnosticsSnapshot{});
+    DiagnosticsSnapshot diagnostics;
+    if (state_ == SimulationState::Fault && hasLastFaultDiagnostics_) {
+        diagnostics = lastFaultDiagnostics_;
+    } else if (const auto modelFault =
+                   modelFaultDiagnostics(QStringLiteral("Model adapter reported fault"))) {
+        diagnostics = *modelFault;
+        enterFault(diagnostics);
+    }
 
     return makeOutputSnapshot(inputSnapshot.revision,
                               lastModelOutputs_,
@@ -113,14 +118,14 @@ SimulationRunnerBase::readCurrentState(const ClientInputSnapshot& inputSnapshot)
                               lastRuntimeDiagnostics_);
 }
 
-ModelOutputSnapshot
+exchange::ModelOutputSnapshot
 SimulationRunnerBase::makeOutputSnapshot(
     std::uint64_t sourceInputRevision,
     std::optional<ModelOutputs> outputs,
     const DiagnosticsSnapshot& diagnostics,
     RuntimeDiagnostics runtimeDiagnostics)
 {
-    ModelOutputSnapshot snapshot;
+    exchange::ModelOutputSnapshot snapshot;
     snapshot.revision = ++outputRevision_;
     snapshot.sourceInputRevision = sourceInputRevision;
     snapshot.state = state_;
@@ -136,20 +141,41 @@ DiagnosticsSnapshot
 SimulationRunnerBase::failureDiagnostics(
     const QString& message) const
 {
-    auto diagnostics =
-        adapterInitialized_ ? modelAdapter_.diagnostics() : DiagnosticsSnapshot{};
-    if (!diagnostics.hasFault()) {
-        diagnostics.faultCode = SimulationFaultCode::InternalError;
-        diagnostics.message = message;
+    if (const auto modelFault = modelFaultDiagnostics(message)) {
+        return *modelFault;
     }
 
+    DiagnosticsSnapshot diagnostics;
+    diagnostics.faultCode = SimulationFaultCode::InternalError;
+    diagnostics.message = message;
+    return diagnostics;
+}
+
+std::optional<DiagnosticsSnapshot>
+SimulationRunnerBase::modelFaultDiagnostics(
+    const QString& fallbackMessage) const
+{
+    if (!adapterInitialized_) {
+        return std::nullopt;
+    }
+
+    const auto modelDiagnostics = modelAdapter_.diagnostics();
+    if (!modelDiagnostics.hasFault()) {
+        return std::nullopt;
+    }
+
+    DiagnosticsSnapshot diagnostics;
+    diagnostics.faultCode = SimulationFaultCode::ModelAdapterFault;
+    diagnostics.message = modelDiagnostics.message.isEmpty()
+        ? fallbackMessage
+        : modelDiagnostics.message;
     return diagnostics;
 }
 
 RuntimeDiagnostics
 SimulationRunnerBase::runtimeDiagnosticsForOutputs(
     const ModelOutputs& outputs,
-    const SimulationLimits& limits) const
+    const Limits &limits) const
 {
     RuntimeDiagnostics diagnostics;
     const auto appendViolation = [&diagnostics](
@@ -258,6 +284,12 @@ bool SimulationRunnerBase::ensureInitialized()
     }
 
     adapterInitialized_ = true;
+    if (const auto modelFault =
+            modelFaultDiagnostics(QStringLiteral("Model adapter reported fault after initialization"))) {
+        enterFault(*modelFault);
+        return false;
+    }
+
     return true;
 }
 
@@ -280,7 +312,8 @@ bool SimulationRunnerBase::resetModel()
     return true;
 }
 
-void SimulationRunnerBase::rememberInputs(const ClientInputSnapshot& inputSnapshot)
+void SimulationRunnerBase::rememberInputs(
+    const exchange::ClientInputSnapshot& inputSnapshot)
 {
     if (!inputSnapshot.inputs.has_value()) {
         return;
@@ -290,7 +323,8 @@ void SimulationRunnerBase::rememberInputs(const ClientInputSnapshot& inputSnapsh
     hasCurrentInputs_ = true;
 }
 
-void SimulationRunnerBase::recordSnapshot(const ModelOutputSnapshot& snapshot)
+void SimulationRunnerBase::recordSnapshot(
+    const exchange::ModelOutputSnapshot& snapshot)
 {
     lastProducedSnapshot_ = snapshot;
     lastRuntimeDiagnostics_ = snapshot.runtimeDiagnostics;

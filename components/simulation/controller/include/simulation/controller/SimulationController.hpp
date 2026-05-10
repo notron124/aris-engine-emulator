@@ -1,7 +1,7 @@
 #ifndef SIMULATIONCONTROLLER_HPP
 #define SIMULATIONCONTROLLER_HPP
 
-#include "SimulationTypes.hpp"
+#include "simulation/controller/SimulationTypes.hpp"
 
 #include <QObject>
 
@@ -10,11 +10,11 @@
 #include <memory>
 #include <optional>
 
-namespace emulator::simulation {
-
-namespace model {
+namespace emulator::model {
 class ModelAdapter;
-} // namespace model
+} // namespace emulator::model
+
+namespace emulator::simulation {
 
 namespace detail {
 class SimulationRunner;
@@ -43,7 +43,7 @@ public:
      */
     explicit SimulationController(
         model::ModelAdapter& modelAdapter,
-        SimulationConfig config = continuous50Config,
+        SimulationConfig config = continuous5Config,
         QObject* parent = nullptr);
 
     /**
@@ -80,8 +80,8 @@ public:
      * @return Выходной снимок, если после обработки есть что публиковать в
      * регистровый слой; `std::nullopt`, если публикация не требуется.
      */
-    [[nodiscard]] std::optional<ModelOutputSnapshot> processSnapshot(
-        const ClientInputSnapshot& inputSnapshot);
+    [[nodiscard]] std::optional<exchange::ModelOutputSnapshot> processSnapshot(
+        const exchange::ClientInputSnapshot& inputSnapshot);
 
     /**
      * @brief Возвращает текущее состояние симуляции.
@@ -108,7 +108,7 @@ public:
     /**
      * @brief Возвращает последний сформированный выходной снимок, если он есть.
      */
-    [[nodiscard]] std::optional<ModelOutputSnapshot> lastOutputSnapshot() const;
+    [[nodiscard]] std::optional<exchange::ModelOutputSnapshot> lastOutputSnapshot() const;
 
 signals:
     /**
@@ -133,10 +133,10 @@ signals:
      * симуляцию в SimulationState::Fault. Например, при ошибке модели,
      * превышении лимитов или неподдерживаемом SimulationRunMode.
      *
-     * @note DiagnosticsSnapshot зарегистрирован как метатип Qt.
+     * @note SimulationDiagnosticsSnapshot зарегистрирован как метатип Qt.
      */
     void sig_faultOccurred(
-        emulator::simulation::DiagnosticsSnapshot diagnostics);
+        emulator::simulation::diagnostics::SimulationDiagnosticsSnapshot diagnostics);
 
     /**
      * @brief Сигнал о формировании выходного снимка контроллером.

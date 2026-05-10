@@ -1,4 +1,4 @@
-#include "SimulationController.hpp"
+#include "simulation/controller/SimulationController.hpp"
 
 #include "runners/ContinuousSimulationRunner.hpp"
 #include "runners/StepOnDemandSimulationRunner.hpp"
@@ -72,8 +72,8 @@ SimulationController::SimulationController(
 
 SimulationController::~SimulationController() = default;
 
-std::optional<ModelOutputSnapshot>
-SimulationController::processSnapshot(const ClientInputSnapshot& inputSnapshot)
+std::optional<exchange::ModelOutputSnapshot>
+SimulationController::processSnapshot(const exchange::ClientInputSnapshot& inputSnapshot)
 {
     if (!runner_) {
         emit sig_faultOccurred(unsupportedRunModeDiagnostics());
@@ -113,7 +113,7 @@ SimulationController::modelTime() const
     return runner_->modelTime();
 }
 
-std::optional<ModelOutputSnapshot>
+std::optional<exchange::ModelOutputSnapshot>
 SimulationController::lastOutputSnapshot() const
 {
     if (!runner_) {

@@ -72,6 +72,7 @@ bool ModbusTcpServer::writeData(const QModbusDataUnit& data) {
     const QModbusDataUnit::RegisterType regType = data.registerType();
     const qsizetype startAddr = data.startAddress();
     const QList<uint16_t> payload = data.values();
+    bool written = false;
 
     switch (regType) {
     case QModbusDataUnit::Coils: {
@@ -81,13 +82,13 @@ bool ModbusTcpServer::writeData(const QModbusDataUnit& data) {
                        [](uint16_t value) {
                            return static_cast<bool>(value);
                        });
-        registerBank_->writeCoils(startAddr, coils);
-        return true;
+        written = registerBank_->writeCoils(startAddr, coils);
+        break;
     }
 
     case QModbusDataUnit::HoldingRegisters: {
-        registerBank_->writeHoldingRegisters(startAddr, payload);
-        return true;
+        written = registerBank_->writeHoldingRegisters(startAddr, payload);
+        break;
     }
 
     case QModbusDataUnit::Invalid: {
@@ -99,7 +100,11 @@ bool ModbusTcpServer::writeData(const QModbusDataUnit& data) {
         return false;
     }
 
-    return QModbusTcpServer::writeData(data);
+    if (written) {
+        emit registerBank_->sig_inputSnapshotUpdated();
+    }
+
+    return written;
 }
 
 }

@@ -20,6 +20,7 @@ add_subdirectory(components/modbus)
 add_subdirectory(components/registerbank)
 add_subdirectory(components/simulation)
 add_subdirectory(components/simple-models)
+add_subdirectory(components/modeladapter)
 
 add_executable(aris-engine
     main.cpp
@@ -29,8 +30,14 @@ target_link_libraries(aris-engine
     PRIVATE
         register-bank
         modbus-server
-        simulation-controller
-        simple-models
+        Emulator::Model::Adapter
+        Emulator::Simulation::Controller
+        Emulator::Simulation::Exchange
 )
 
 # ==============================================================================
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
+

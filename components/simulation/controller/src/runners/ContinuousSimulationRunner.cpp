@@ -17,11 +17,11 @@ ContinuousSimulationRunner::~ContinuousSimulationRunner()
     stopWorker();
 }
 
-std::optional<ModelOutputSnapshot>
+std::optional<exchange::ModelOutputSnapshot>
 ContinuousSimulationRunner::processSnapshot(
-    const ClientInputSnapshot& inputSnapshot)
+    const exchange::ClientInputSnapshot& inputSnapshot)
 {
-    std::optional<ModelOutputSnapshot> result;
+    std::optional<exchange::ModelOutputSnapshot> result;
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -69,16 +69,16 @@ std::chrono::milliseconds ContinuousSimulationRunner::modelTime() const
     return SimulationRunnerBase::modelTime();
 }
 
-std::optional<ModelOutputSnapshot>
+std::optional<exchange::ModelOutputSnapshot>
 ContinuousSimulationRunner::lastOutputSnapshot() const
 {
     std::lock_guard<std::mutex> lock(mutex_);
     return SimulationRunnerBase::lastOutputSnapshot();
 }
 
-std::optional<ModelOutputSnapshot>
+std::optional<exchange::ModelOutputSnapshot>
 ContinuousSimulationRunner::applyInputCommand(
-    const ClientInputSnapshot& inputSnapshot)
+    const exchange::ClientInputSnapshot& inputSnapshot)
 {
     switch (inputSnapshot.command) {
     case SimulationCommand::None:
@@ -217,12 +217,12 @@ ContinuousSimulationRunner::workerLoop()
                 currentInputs_.limits);
             lastRuntimeDiagnostics_ = runtimeDiagnostics;
 
-            const auto diagnostics = modelAdapter_.diagnostics();
-            if (diagnostics.hasFault()) {
-                enterFault(diagnostics);
+            if (const auto diagnostics =
+                    modelFaultDiagnostics(QStringLiteral("Model adapter reported fault after step"))) {
+                enterFault(*diagnostics);
                 recordSnapshot(makeOutputSnapshot(lastInputRevision_,
                                                   outputs,
-                                                  diagnostics,
+                                                  *diagnostics,
                                                   runtimeDiagnostics));
                 continue;
             }
