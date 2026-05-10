@@ -1,278 +1,259 @@
+// ModelAdapter.cpp
 #include "ModelAdapter.hpp"
+#include "models.hpp"
+#include <chrono>
 #include <cmath>
 #include <algorithm>
 
 namespace emulator::model {
 
-// ============================================================================
-// Параметры модели 
-// ============================================================================
-
-static constexpr double J_ICE_ = 3.5;           // кг·м²
-static constexpr double k_heat_ = 0.30;         // 
-static constexpr double k_radiator_ = 450.0;    // Вт/°C
-static constexpr double tau_cool_ = 40.0;       // с
-
-static constexpr double J_AD_ = 1.2;            // кг·м²
-static constexpr double k_loss_AD_ = 0.025;     // 
-static constexpr double k_loss0_AD_ = 800.0;    // Вт
-static constexpr double k_rad_AD_ = 150.0;      // Вт/°C
-static constexpr double tau_AD_base_ = 900.0;   // с
-
-static constexpr double k_rad_ballast_ = 100.0; // Вт/°C
-static constexpr double tau_ballast_ = 600.0;   // с
-static constexpr double P_ballast_nom_ = 400000.0; // Вт
-
-static constexpr double T_amb_ = 25.0;          // °C
-static constexpr double M_AD_nom_ = 3500.0;     // Н·м
-
-// ============================================================================
-// Внутреннее состояние модели
-// ============================================================================
-
-static struct ModelState {
-    // Переменные состояния
-    double omega_ICE = 0.0;          // рад/с
-    double T_cool = T_amb_;          // °C
-    double T_ad = T_amb_;            // °C
-    double T_ballast = T_amb_;       // °C
-    double p_oil = 1.5;              // бар
-    double M_ad = 0.0;               // Н·м
-    double P_ballast = 0.0;          // Вт
-    
-    // Управляющие воздействия
-    double throttle = 0.0;
-    double stator_freq_hz = 0.0;
-    double target_torque = 0.0;
-    bool fan_ad_enabled = true;
-    bool fan_ballast_enabled = true;
-    
-    // Аварийные пределы (задаются через setInputs)
-    double t_cool_max = 105.0;
-    double t_ad_max = 140.0;
-    double t_ballast_max = 250.0;
-    double p_oil_min = 1.5;
-    double p_oil_max = 7.0;
-    double rpm_max_current = 2200.0;
+class ModelAdapter::Impl {
+public:
+    // Компоненты физической модели
+    std::unique_ptr<ICE> ice;
+    std::unique_ptr<AsyncMotor> motor;
+    std::unique_ptr<FrequencyConverter> converter;
+    std::unique_ptr<BallastResistor> ballast;
     
     // Состояние модели
-    bool is_running = false;     // true = модель считает, false = модель остановлена
-    bool emergency_flag = false; // false = штатная остановка, true = авария
-    int emergency_code = 0;      // код аварии 
     double current_time = 0.0;
-} state;
-
-// ============================================================================
-// Вспомогательные функции
-// ============================================================================
-
-static double calculateDriveTorque() {
-    // Упрощённая зависимость момента от положения дросселя и оборотов
-    double max_torque = 5000.0;  // Н·м
-    return state.throttle * max_torque;
-}
-
-static double calculateFrictionTorque() {
-    // Внутреннее трение ДВС
-    double rpm = state.omega_ICE * 60.0 / (2.0 * M_PI);
-    return 50.0 + 0.1 * rpm;  // Н·м
-}
-
-static double calculateFlowFactorAD() {
-    if (!state.fan_ad_enabled) {
-        return 0.3;  // Минимальный обдув
-    }
-    double load_factor = std::abs(state.M_ad) / M_AD_nom_;
-    return 0.3 + 0.7 * load_factor;
-}
-
-static double calculateFlowFactorBallast() {
-    if (!state.fan_ballast_enabled) {
-        return 0.2;  // Минимальный обдув
-    }
-    double load_factor = state.P_ballast / P_ballast_nom_;
-    return 0.2 + 0.8 * load_factor;
-}
-
-static void checkEmergencyLimits() {
-    double rpm = state.omega_ICE * 60.0 / (2.0 * M_PI);
-
-    if (state.T_cool >= state.t_cool_max) {
-        state.emergency_flag = true;
-        state.emergency_code = 1;  // Перегрев ОЖ
-        state.is_running = false;
-    }
-    else if (state.T_ad >= state.t_ad_max) {
-        state.emergency_flag = true;
-        state.emergency_code = 2;  // Перегрев АД
-        state.is_running = false;
-    }
-    else if (state.T_ballast >= state.t_ballast_max) {
-        state.emergency_flag = true;
-        state.emergency_code = 3;  // Перегрев балласта
-        state.is_running = false;
-    }
-    else if (state.p_oil <= state.p_oil_min) {
-        state.emergency_flag = true;
-        state.emergency_code = 4;  // Низкое давление масла
-        state.is_running = false;
-    }
-    else if (state.p_oil >= state.p_oil_max) {
-        state.emergency_flag = true;
-        state.emergency_code = 5;  // Высокое давление масла
-        state.is_running = false;
-    }
-    else if (rpm >= state.rpm_max_current && state.rpm_max_current > 0) {
-        state.emergency_flag = true;
-        state.emergency_code = 6;  // Превышение оборотов
-        state.is_running = false;
-    }
-}
-
-static void solveMechanics(double dt) {
-    double M_drive = calculateDriveTorque();
-    double M_friction = calculateFrictionTorque();
-    double M_load = state.M_ad;
+    bool is_running = true;
+    bool emergency_flag = false;
+    int emergency_code = 0;
     
-    double domega_dt = (M_drive - M_friction - M_load) / J_ICE_;
-    state.omega_ICE += domega_dt * dt;
-
-    if (state.omega_ICE < 0.0) state.omega_ICE = 0.0;
-
-    state.M_ad = state.target_torque;
-}
-
-static void updateThermal(double dt) {
-    double P_ICE = calculateDriveTorque() * state.omega_ICE;
-    double omega_AD = state.omega_ICE;
-    double P_loss_AD = k_loss_AD_ * std::abs(state.M_ad) * omega_AD + k_loss0_AD_;
+    // Целевые значения от пользователя
+    double target_rpm = 0.0;           // целевые обороты ДВС, об/мин
+    double target_torque_nm = 0.0;     // целевой тормозной момент АД, Н·м
     
-    double omega_sync = 2.0 * M_PI * state.stator_freq_hz / 2.0;
-    state.P_ballast = std::max(0.0, state.M_ad * (state.omega_ICE - omega_sync));
-
-    // ОЖ
-    double P_heat_cool = k_heat_ * P_ICE;
-    double T_steady_cool = T_amb_ + P_heat_cool / k_radiator_;
-    double alpha_cool = std::exp(-dt / tau_cool_);
-    state.T_cool = T_steady_cool + (state.T_cool - T_steady_cool) * alpha_cool;
+    // Аварийные пределы (от пользователя)
+    double t_cool_max = 105.0;         // максимальная температура ОЖ, °C
+    double t_ad_max = 140.0;           // максимальная температура АД, °C
+    double t_ballast_max = 250.0;      // максимальная температура балласта, °C
+    double p_oil_min = 1.5;            // минимальное давление масла, бар
+    double p_oil_max = 7.0;            // максимальное давление масла, бар
+    double rpm_max_current = 2200.0;   // текущий предел оборотов, об/мин
     
-    // АД
-    double flow_factor_AD = calculateFlowFactorAD();
-    double tau_AD = tau_AD_base_ / flow_factor_AD;
-    double T_steady_AD = T_amb_ + P_loss_AD / (k_rad_AD_ * flow_factor_AD);
-    double alpha_AD = std::exp(-dt / tau_AD);
-    state.T_ad = T_steady_AD + (state.T_ad - T_steady_AD) * alpha_AD;
+    // Конструктор: создаём компоненты
+    Impl()
+        : ice(std::make_unique<ICE>())
+        , motor(std::make_unique<AsyncMotor>())
+        , converter(std::make_unique<FrequencyConverter>())
+        , ballast(std::make_unique<BallastResistor>())
+    {
+        // Передаём номинальный момент АД в ЧП
+        // M_AD_nom берётся из конструктора AsyncMotor (по умолчанию 2000.0)
+        converter->set_ad_parameters(motor->get_moment());  
+    }
     
-    // Балласт
-    double fan_factor = calculateFlowFactorBallast();
-    double T_steady_ballast = T_amb_ + state.P_ballast / (k_rad_ballast_ * fan_factor);
-    double alpha_ballast = std::exp(-dt / tau_ballast_);
-    state.T_ballast = T_steady_ballast + (state.T_ballast - T_steady_ballast) * alpha_ballast;
-}
+    // Проверка аварийных пределов 
+    void checkEmergencyLimits() {
+        // Получаем текущие показания датчиков
+        double rpm = ice->get_omega() * 60.0 / (2.0 * M_PI);
+        double t_cool = ice->get_temperature();
+        double t_ad = motor->get_temperature();
+        double t_ballast = ballast->get_temperature();
+        double p_oil = ice->get_oil_pressure();
+        
+        // Проверка по порядку приоритета (первое сработавшее фиксируем)
+        if (t_cool >= t_cool_max) {
+            emergency_flag = true;
+            emergency_code = 1;        // Перегрев ОЖ
+            is_running = false;
+        }
+        else if (t_ad >= t_ad_max) {
+            emergency_flag = true;
+            emergency_code = 2;        // Перегрев АД
+            is_running = false;
+        }
+        else if (t_ballast >= t_ballast_max) {
+            emergency_flag = true;
+            emergency_code = 3;        // Перегрев балласта
+            is_running = false;
+        }
+        else if (p_oil <= p_oil_min) {
+            emergency_flag = true;
+            emergency_code = 4;        // Низкое давление масла
+            is_running = false;
+        }
+        else if (p_oil >= p_oil_max) {
+            emergency_flag = true;
+            emergency_code = 5;        // Высокое давление масла
+            is_running = false;
+        }
+        else if (rpm >= rpm_max_current && rpm_max_current > 0) {
+            emergency_flag = true;
+            emergency_code = 6;        // Превышение оборотов
+            is_running = false;
+        }
+    }
+};
 
-static void calculateOilPressure() {
-    double rpm = state.omega_ICE * 60.0 / (2.0 * M_PI);
-    double p_base = 1.0 + rpm / 500.0;
-    double temp_factor = 1.0 - 0.005 * (state.T_cool - 80.0);
-    temp_factor = std::max(0.5, std::min(1.2, temp_factor));
-    state.p_oil = p_base * temp_factor;
-    state.p_oil = std::max(0.5, std::min(10.0, state.p_oil));
-}
+// Конструктор / Деструктор
 
-// ============================================================================
-// Публичные методы ModelAdapter
-// ============================================================================
+ModelAdapter::ModelAdapter() : pimpl(std::make_unique<Impl>()) {}
+
+ModelAdapter::~ModelAdapter() = default;
 
 bool ModelBase::initialize() {
-    // Сброс всех параметров в начальные значения
-    state = ModelState{};
-    state.is_running = true;
+    pimpl->is_running = true;
+    pimpl->emergency_flag = false;
+    pimpl->emergency_code = 0;
+    pimpl->current_time = 0.0;
     return true;
 }
 
-bool ModelBase::reset() {
-    state = ModelState{};
-    state.is_running = true;
+bool ModelAdapter::reset() {
+    // Пересоздаём все компоненты с начальными параметрами
+    pimpl->ice = std::make_unique<ICE>();
+    pimpl->motor = std::make_unique<AsyncMotor>();
+    pimpl->converter = std::make_unique<FrequencyConverter>();
+    pimpl->ballast = std::make_unique<BallastResistor>();
+    
+    // Повторно передаём номинальный момент в ЧП
+    pimpl->converter->set_ad_parameters(pimpl->motor->get_moment());
+    
+    // Сброс состояния
+    pimpl->current_time = 0.0;
+    pimpl->is_running = true;
+    pimpl->emergency_flag = false;
+    pimpl->emergency_code = 0;
+    
     return true;
 }
 
-bool ModelBase::setInputs(const ModelInputs& inputs) {
-    state.throttle = inputs.throttle_position;
-    state.stator_freq_hz = inputs.stator_frequency_hz;
-    state.target_torque = inputs.target_brake_torque_nm;
-    state.fan_ad_enabled = inputs.fan_AD_enabled;
-    state.fan_ballast_enabled = inputs.fan_ballast_enabled;
+// Управление (входные данные от пользователя)
+
+bool ModelAdapter::setInputs(const ModelInputs& inputs) {
+    // Сохраняем целевые значения от пользователя
+    pimpl->target_rpm = inputs.target_rpm;               // об/мин
+    pimpl->target_torque_nm = inputs.target_torque_nm;   // Н·м
     
-    state.t_cool_max = inputs.limits.T_cool_max;
-    state.t_ad_max = inputs.limits.T_AD_max;
-    state.t_ballast_max = inputs.limits.T_ballast_max;
-    state.p_oil_min = inputs.limits.P_oil_min;
-    state.p_oil_max = inputs.limits.P_oil_max;
-    state.rpm_max_current = std::min(inputs.limits.rpm_max_lapping, inputs.limits.rpm_max_run);
+    // Обновляем аварийные пределы (могут меняться через SCADA)
+    pimpl->t_cool_max = inputs.t_cool_max;
+    pimpl->t_ad_max = inputs.t_ad_max;
+    pimpl->t_ballast_max = inputs.t_ballast_max;
+    pimpl->p_oil_min = inputs.p_oil_min;
+    pimpl->p_oil_max = inputs.p_oil_max;
     
-    if (inputs.emergency_stop_requested) {
-        state.emergency_flag = true;
-        state.emergency_code = 7;
-        state.is_running = false;
+    // Выбираем предел оборотов в зависимости от режима
+    if (inputs.mode == ModelInputs::Mode::LAPPING) {
+        pimpl->rpm_max_current = inputs.rpm_max_lapping;
+    } else {
+        pimpl->rpm_max_current = inputs.rpm_max_run;
+    }
+    
+    // Управление вентиляторами 
+    pimpl->motor->set_fan(inputs.fan_ad_enabled);
+    pimpl->ballast->set_fan(inputs.fan_ballast_enabled);
+    
+    // Устанавливаем целевые обороты ДВС
+    pimpl->ice->set_target_n_rpm(inputs.target_rpm);
+    
+    // Передаём тормозной момент в ЧП (он далее пойдёт в АД)
+    // Получаем текущие обороты ротора для расчёта скольжения
+    double n_rpm_rotor = pimpl->ice->get_omega() * 60.0 / (2.0 * M_PI);
+    pimpl->converter->set_target_torque(inputs.target_torque_nm, n_rpm_rotor);
+    
+    // Аварийная остановка по команде пользователя 
+    if (inputs.emergency_stop) {
+        pimpl->emergency_flag = true;
+        pimpl->emergency_code = 7;   // Аварийная остановка по команде
+        pimpl->is_running = false;
     }
     
     return true;
 }
 
-bool ModelBase::step(std::chrono::milliseconds modelTime, std::chrono::milliseconds dt) {
-    if (!state.is_running || state.emergency_flag) return false;
+// Шаг моделирования
+
+bool ModelAdapter::step(std::chrono::milliseconds dt) {
+    if (!pimpl->is_running || pimpl->emergency_flag) return false;
     
     double dt_sec = dt.count() / 1000.0;
-    if (dt_sec <= 0) return true;
+    if (dt_sec <= 0.0) return true;
     
-    solveMechanics(dt_sec);
-    updateThermal(dt_sec);
-    calculateOilPressure();
-    checkEmergencyLimits();
+    // 1. Получаем текущий момент АД
+    double M_AD = pimpl->motor->get_moment();
     
-    state.current_time = modelTime.count() / 1000.0;
+    // 2. Шаг ДВС (передаём момент АД как внешнюю нагрузку)
+    //    J_AD передаётся из параметров AsyncMotor
+    pimpl->ice->step(dt_sec, M_AD, 1.2);  // J_AD = 1.2 кг·м²
     
-    return !state.emergency_flag;
+    // 3. Получаем текущую угловую скорость ДВС
+    double omega_ice = pimpl->ice->get_omega();
+    double n_rpm_ice = omega_ice * 60.0 / (2.0 * M_PI);
+    
+    // 4. Получаем синхронную скорость от ЧП (на основе заданного тормозного момента)
+    double omega_sync = pimpl->converter->get_sync_omega();
+    
+    // 5. Шаг АД (тормозной режим)
+    pimpl->motor->step(dt_sec, omega_ice, omega_sync);
+    
+    // 6. Расчёт мощности на балластном резисторе (ТЗ п.3.3)
+    double P_ballast = pimpl->converter->calc_ballast_power(M_AD, n_rpm_ice);
+    pimpl->ballast->set_power(P_ballast);
+    
+    // 7. Шаг балластного резистора (тепловая модель)
+    pimpl->ballast->step(dt_sec);
+    
+    // 8. Проверка аварийных пределов
+    pimpl->checkEmergencyLimits();
+    
+    // 9. Обновление симуляционного времени
+    pimpl->current_time += dt_sec;
+    
+    return !pimpl->emergency_flag;
 }
 
-ModelOutputs ModelBase::readOutputs() const {
-    ModelOutputs outputs;
-    outputs.ice_rpm = state.omega_ICE * 60.0 / (2.0 * M_PI); // перевод в об./мин.
-    outputs.t_cool_c = state.T_cool;
-    outputs.t_ad_c = state.T_ad;
-    outputs.t_ballast_c = state.T_ballast;
-    outputs.p_oil_bar = state.p_oil;
-    outputs.m_ad_nm = state.M_ad;
-    return outputs;
-}
+// Чтение выходных данных (датчики)
 
-bool ModelBase::isRunning() const {
-    return state.is_running;
-}
-
-bool ModelBase::isEmergency() const {
-    return state.emergency_flag;
-}
-
-diagnostics::ModelDiagnosticsSnapshot ModelBase::diagnostics() const {
-    diagnostics::ModelDiagnosticsSnapshot snap;
-    // snap.is_running = state.is_running;
-    // snap.is_emergency = state.emergency_flag;
-    // snap.emergency_code = state.emergency_code;
-    // snap.current_time_s = state.current_time;
+ModelOutputs ModelAdapter::readOutputs() const {
+    ModelOutputs out;
     
-    // auto outputs = readOutputs();
-    // snap.ice_rpm = outputs.ice_rpm;
-    // snap.t_cool_c = outputs.t_cool_c;
-    // snap.t_ad_c = outputs.t_ad_c;
-    // snap.t_ballast_c = outputs.t_ballast_c;
-    // snap.p_oil_bar = outputs.p_oil_bar;
-    // snap.m_ad_nm = outputs.m_ad_nm;
+    // 6 датчиков согласно ТЗ п.3.5.1 и п.5
+    out.ice_rpm = pimpl->ice->get_omega() * 60.0 / (2.0 * M_PI);
+    out.t_cool_c = pimpl->ice->get_temperature();
+    out.t_ad_c = pimpl->motor->get_temperature();
+    out.t_ballast_c = pimpl->ballast->get_temperature();
+    out.p_oil_bar = pimpl->ice->get_oil_pressure();
+    out.m_ad_nm = pimpl->motor->get_moment();
     
-    // snap.throttle_position = state.throttle;
-    // snap.stator_frequency_hz = state.stator_freq_hz;
-    // snap.fan_ad_enabled = state.fan_ad_enabled;
-    // snap.fan_ballast_enabled = state.fan_ballast_enabled;
+    return out;
+}
+
+// Состояние модели
+
+bool ModelAdapter::isRunning() const {
+    return pimpl->is_running && !pimpl->emergency_flag;
+}
+
+bool ModelAdapter::isEmergency() const {
+    return pimpl->emergency_flag;
+}
+
+// Полная диагностика
+
+DiagnosticsSnapshot ModelAdapter::diagnostics() const {
+    DiagnosticsSnapshot snap;
+    
+    // Состояние модели
+    snap.is_running = isRunning();
+    snap.is_emergency = pimpl->emergency_flag;
+    snap.emergency_code = pimpl->emergency_code;   
+    snap.current_time_s = pimpl->current_time;     
+    
+    // Данные с датчиков
+    auto out = readOutputs();
+    snap.ice_rpm = out.ice_rpm;
+    snap.t_cool_c = out.t_cool_c;
+    snap.t_ad_c = out.t_ad_c;
+    snap.t_ballast_c = out.t_ballast_c;
+    snap.p_oil_bar = out.p_oil_bar;
+    snap.m_ad_nm = out.m_ad_nm;
+    
+    // Дополнительная диагностика
+    snap.target_rpm = pimpl->target_rpm;
+    snap.target_torque_nm = pimpl->target_torque_nm;
     
     if (state.emergency_flag) {
         snap.faultCode = diagnostics::ModelFaultCode::Emergency;
