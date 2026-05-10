@@ -1,13 +1,15 @@
-// ModelAdapter.cpp
+// ModelBase.cpp
 #include "ModelAdapter.hpp"
 #include "models.hpp"
+
 #include <chrono>
 #include <cmath>
 #include <algorithm>
+#include <memory>
 
 namespace emulator::model {
 
-class ModelAdapter::Impl {
+class Impl {
 public:
     // Компоненты физической модели
     std::unique_ptr<ICE> ice;
@@ -90,9 +92,12 @@ public:
 
 // Конструктор / Деструктор
 
-ModelAdapter::ModelAdapter() : pimpl(std::make_unique<Impl>()) {}
+ModelBase::ModelBase() : pimpl(std::make_unique<Impl>())
+{
 
-ModelAdapter::~ModelAdapter() = default;
+}
+
+ModelBase::~ModelBase() = default;
 
 bool ModelBase::initialize() {
     pimpl->is_running = true;
@@ -102,7 +107,7 @@ bool ModelBase::initialize() {
     return true;
 }
 
-bool ModelAdapter::reset() {
+bool ModelBase::reset() {
     // Пересоздаём все компоненты с начальными параметрами
     pimpl->ice = std::make_unique<ICE>();
     pimpl->motor = std::make_unique<AsyncMotor>();
@@ -123,27 +128,27 @@ bool ModelAdapter::reset() {
 
 // Управление (входные данные от пользователя)
 
-bool ModelAdapter::setInputs(const ModelInputs& inputs) {
+bool ModelBase::setInputs(const ModelInputs& inputs) {
     // Сохраняем целевые значения от пользователя
     pimpl->target_rpm = inputs.target_rpm;               // об/мин
     pimpl->target_torque_nm = inputs.target_torque_nm;   // Н·м
     
     // Обновляем аварийные пределы (могут меняться через SCADA)
-    pimpl->t_cool_max = inputs.t_cool_max;
-    pimpl->t_ad_max = inputs.t_ad_max;
-    pimpl->t_ballast_max = inputs.t_ballast_max;
-    pimpl->p_oil_min = inputs.p_oil_min;
-    pimpl->p_oil_max = inputs.p_oil_max;
+    pimpl->t_cool_max = inputs.limits.T_cool_max;
+    pimpl->t_ad_max = inputs.limits.T_AD_max;
+    pimpl->t_ballast_max = inputs.limits.T_ballast_max;
+    pimpl->p_oil_min = inputs.limits.P_oil_min;
+    pimpl->p_oil_max = inputs.limits.P_oil_max;
     
     // Выбираем предел оборотов в зависимости от режима
-    if (inputs.mode == ModelInputs::Mode::LAPPING) {
-        pimpl->rpm_max_current = inputs.rpm_max_lapping;
+    if (inputs.mode == ::emulator::simulation::SimulationMode::ColdRun) {
+        pimpl->rpm_max_current = inputs.limits.rpm_max_lapping;
     } else {
-        pimpl->rpm_max_current = inputs.rpm_max_run;
+        pimpl->rpm_max_current = inputs.limits.rpm_max_run;
     }
     
     // Управление вентиляторами 
-    pimpl->motor->set_fan(inputs.fan_ad_enabled);
+    pimpl->motor->set_fan(inputs.fan_AD_enabled);
     pimpl->ballast->set_fan(inputs.fan_ballast_enabled);
     
     // Устанавливаем целевые обороты ДВС
@@ -151,7 +156,7 @@ bool ModelAdapter::setInputs(const ModelInputs& inputs) {
     
     // Передаём тормозной момент в ЧП (он далее пойдёт в АД)
     // Получаем текущие обороты ротора для расчёта скольжения
-    double n_rpm_rotor = pimpl->ice->get_omega() * 60.0 / (2.0 * M_PI);
+    const double n_rpm_rotor {pimpl->ice->get_omega() * 60.0 / (2.0 * M_PI)};
     pimpl->converter->set_target_torque(inputs.target_torque_nm, n_rpm_rotor);
     
     // Аварийная остановка по команде пользователя 
@@ -166,7 +171,10 @@ bool ModelAdapter::setInputs(const ModelInputs& inputs) {
 
 // Шаг моделирования
 
-bool ModelAdapter::step(std::chrono::milliseconds dt) {
+bool ModelBase::step(
+    std::chrono::milliseconds /*modelTime*/,
+    std::chrono::milliseconds dt)
+{
     if (!pimpl->is_running || pimpl->emergency_flag) return false;
     
     double dt_sec = dt.count() / 1000.0;
@@ -207,7 +215,7 @@ bool ModelAdapter::step(std::chrono::milliseconds dt) {
 
 // Чтение выходных данных (датчики)
 
-ModelOutputs ModelAdapter::readOutputs() const {
+ModelOutputs ModelBase::readOutputs() const {
     ModelOutputs out;
     
     // 6 датчиков согласно ТЗ п.3.5.1 и п.5
@@ -223,41 +231,43 @@ ModelOutputs ModelAdapter::readOutputs() const {
 
 // Состояние модели
 
-bool ModelAdapter::isRunning() const {
+bool ModelBase::isRunning() const {
     return pimpl->is_running && !pimpl->emergency_flag;
 }
 
-bool ModelAdapter::isEmergency() const {
+bool ModelBase::isEmergency() const {
     return pimpl->emergency_flag;
 }
 
 // Полная диагностика
 
-DiagnosticsSnapshot ModelAdapter::diagnostics() const {
-    DiagnosticsSnapshot snap;
+diagnostics::ModelDiagnosticsSnapshot
+ModelBase::diagnostics() const
+{
+    diagnostics::ModelDiagnosticsSnapshot snap;
     
-    // Состояние модели
-    snap.is_running = isRunning();
-    snap.is_emergency = pimpl->emergency_flag;
-    snap.emergency_code = pimpl->emergency_code;   
-    snap.current_time_s = pimpl->current_time;     
+    // // Состояние модели
+    // snap.is_running = isRunning();
+    // snap.is_emergency = pimpl->emergency_flag;
+    // snap.emergency_code = pimpl->emergency_code;
+    // snap.current_time_s = pimpl->current_time;
     
-    // Данные с датчиков
-    auto out = readOutputs();
-    snap.ice_rpm = out.ice_rpm;
-    snap.t_cool_c = out.t_cool_c;
-    snap.t_ad_c = out.t_ad_c;
-    snap.t_ballast_c = out.t_ballast_c;
-    snap.p_oil_bar = out.p_oil_bar;
-    snap.m_ad_nm = out.m_ad_nm;
+    // // Данные с датчиков
+    // auto out = readOutputs();
+    // snap.ice_rpm = out.ice_rpm;
+    // snap.t_cool_c = out.t_cool_c;
+    // snap.t_ad_c = out.t_ad_c;
+    // snap.t_ballast_c = out.t_ballast_c;
+    // snap.p_oil_bar = out.p_oil_bar;
+    // snap.m_ad_nm = out.m_ad_nm;
     
-    // Дополнительная диагностика
-    snap.target_rpm = pimpl->target_rpm;
-    snap.target_torque_nm = pimpl->target_torque_nm;
+    // // Дополнительная диагностика
+    // snap.target_rpm = pimpl->target_rpm;
+    // snap.target_torque_nm = pimpl->target_torque_nm;
     
-    if (state.emergency_flag) {
+    if (pimpl->emergency_flag) {
         snap.faultCode = diagnostics::ModelFaultCode::Emergency;
-        snap.message = QStringLiteral("Model emergency code %1").arg(state.emergency_code);
+        snap.message = QStringLiteral("Model emergency code %1").arg(pimpl->emergency_code);
     }
     return snap;
 }

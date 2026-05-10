@@ -6,6 +6,8 @@
 
 namespace emulator::model {
 
+class Impl;
+
 class ModelAdapter {
 public:
     virtual ~ModelAdapter() = default;
@@ -37,8 +39,8 @@ public:
 
 class ModelBase : public ModelAdapter {
 public:
-    ModelBase() = default;
-    ~ModelBase() override = default;
+    ModelBase();
+    ~ModelBase() override;
 
     bool initialize() override;
     bool reset() override;
@@ -52,6 +54,9 @@ public:
     [[nodiscard]] virtual diagnostics::ModelDiagnosticsSnapshot diagnostics() const override;
     [[nodiscard]] bool isRunning() const override;
     [[nodiscard]] bool isEmergency() const override;
+
+private:
+    std::unique_ptr<Impl> pimpl;
 };
 
 } 

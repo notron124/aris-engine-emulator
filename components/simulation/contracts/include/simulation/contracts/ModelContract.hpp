@@ -85,10 +85,10 @@ struct ModelInputs {
     Limits limits = defaultLimits;
 
     /// @todo Добавлено исключительно для обеспечения совместимости, исправить.
-    double throttle_position, stator_frequency_hz, target_brake_torque_nm, t_cool_max, t_ad_max, t_ballast_max, p_oil_min;
+    double target_rpm, target_torque_nm, throttle_position, stator_frequency_hz, target_brake_torque_nm;
 
     /// @todo Определить механизм аварийного завершения модели.
-    bool emergency_stop_requested;
+    bool emergency_stop;
 };
 
 /**
