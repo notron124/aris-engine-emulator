@@ -43,7 +43,7 @@ constexpr ModelOutputs testModelOutputs {
 SimulationConfig
 stepOnDemandTestConfig()
 {
-    return stepOnDemand50Config;
+    return stepOnDemand5Config;
 }
 
 // Continuous-тесты используют короткий шаг, чтобы фоновой поток успевал
@@ -51,7 +51,7 @@ stepOnDemandTestConfig()
 SimulationConfig
 continuousTestConfig()
 {
-    auto config = continuous50Config;
+    auto config = continuous5Config;
     config.integrationStep = std::chrono::milliseconds{10};
     return config;
 }

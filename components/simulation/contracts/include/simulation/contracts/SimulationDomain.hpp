@@ -119,9 +119,9 @@ struct SimulationConfig {
  *
  * Внутренний шаг интегрирования 50 мс.
  */
-inline constexpr SimulationConfig stepOnDemand50Config {
+inline constexpr SimulationConfig stepOnDemand5Config {
     SimulationRunMode::StepOnDemand,
-    std::chrono::milliseconds{50},
+    std::chrono::milliseconds{5},
     LimitViolationAction::ReportOnly
 };
 
@@ -131,9 +131,9 @@ inline constexpr SimulationConfig stepOnDemand50Config {
  * После SimulationCommand::Start модель выполняется в фоне с внутренним
  * шагом интегрирования 50 мс.
  */
-inline constexpr SimulationConfig continuous50Config {
+inline constexpr SimulationConfig continuous5Config {
     SimulationRunMode::Continuous,
-    std::chrono::milliseconds{50},
+    std::chrono::milliseconds{5},
     LimitViolationAction::ReportOnly
 };
 

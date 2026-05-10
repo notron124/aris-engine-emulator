@@ -23,6 +23,11 @@ namespace emulator::registerbank {
 
 		registerBankStoredInputs.f_AD = holdingRegToDouble(f_AD_Input);
 		registerBankStoredInputs.M_AD_target = holdingRegToDouble(M_AD_target);
+        registerBankStoredInputs.stator_frequency_hz = registerBankStoredInputs.f_AD;
+        registerBankStoredInputs.target_torque_nm =
+            registerBankStoredInputs.M_AD_target;
+        registerBankStoredInputs.target_brake_torque_nm =
+            registerBankStoredInputs.M_AD_target;
 		registerBankStoredInputs.fan_ICE_enabled = coils_[fan_ICE];
 		registerBankStoredInputs.fan_AD_enabled = coils_[fan_AD];
 		registerBankStoredInputs.fan_ballast_enabled = coils_[fan_ballast];

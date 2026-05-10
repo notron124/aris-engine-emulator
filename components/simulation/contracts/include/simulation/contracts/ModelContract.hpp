@@ -50,7 +50,8 @@ struct Limits {
     double T_ballast_max = 250.0;
 
     /// @todo Добавлено исключительно для обеспечения совместимости, исправить.
-    double rpm_max_lapping, rpm_max_run;
+    double rpm_max_lapping = 200.0;
+    double rpm_max_run = 2000.0;
 };
 
 /**
@@ -85,10 +86,14 @@ struct ModelInputs {
     Limits limits = defaultLimits;
 
     /// @todo Добавлено исключительно для обеспечения совместимости, исправить.
-    double target_rpm, target_torque_nm, throttle_position, stator_frequency_hz, target_brake_torque_nm;
+    double target_rpm = 0.0;
+    double target_torque_nm = 0.0;
+    double throttle_position = 0.0;
+    double stator_frequency_hz = 0.0;
+    double target_brake_torque_nm = 0.0;
 
     /// @todo Определить механизм аварийного завершения модели.
-    bool emergency_stop;
+    bool emergency_stop = false;
 };
 
 /**
@@ -105,7 +110,12 @@ struct ModelOutputs {
     double f_AD                 = 0.0;
 
     /// @todo Добавлено исключительно для обеспечения совместимости, исправить.
-    double ice_rpm, t_cool_c, t_ad_c, t_ballast_c, p_oil_bar, m_ad_nm;
+    double ice_rpm = 0.0;
+    double t_cool_c = 0.0;
+    double t_ad_c = 0.0;
+    double t_ballast_c = 0.0;
+    double p_oil_bar = 0.0;
+    double m_ad_nm = 0.0;
 };
 
 } // namespace emulator::model

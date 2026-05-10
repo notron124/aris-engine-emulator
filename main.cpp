@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
     auto model = emulator::model::ModelBase();
     emulator::simulation::SimulationController controller(
         model,
-        emulator::simulation::continuous50Config,
+        emulator::simulation::continuous5Config,
         &a);
 
     // 3. Настройка моста
