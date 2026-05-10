@@ -2,13 +2,13 @@
 #define REGISTERBANK_HPP
 
 #include <QDebug>
+#include <QObject>
 #include <QList>
 #include <cstring>
 #include <cstdint>
-#include <optional>
-#include <chrono>
 
 #include "simulation/contracts/ExchangeContract.hpp"
+#include "simulation/exchange/SimulationSnapshotExchange.hpp"
 
 namespace emulator::registerbank {
 
@@ -22,10 +22,11 @@ namespace emulator::registerbank {
     using emulator::simulation::SimulationMode;
     using emulator::simulation::SimulationState;
     using simulation::diagnostics::SimulationFaultCode;
+    using emulator::simulation::SimulationSnapshotExchange;
 
-    class RegisterBank{
+    class RegisterBank : public QObject {
+        Q_OBJECT
     public:
-        
         RegisterBank() {
             coils_.resize(numberOfCoils);
             coils_.fill(false);
@@ -92,6 +93,9 @@ namespace emulator::registerbank {
         static constexpr uint16_t hasFault = 0;
         static constexpr uint16_t hasLimitViolations = 1;
 
+    signals:
+        void sig_inputSnapshotUpdated();
+
     protected:
         QList<bool> coils_;
         QList<bool> discreteInputs_;
@@ -113,5 +117,21 @@ namespace emulator::registerbank {
         SimulationMode holdingRegToMode(uint16_t offset) const;
     };
 
+    class SimulationSnapshotExchangeImpl : public SimulationSnapshotExchange {
+    public:
+        SimulationSnapshotExchangeImpl(RegisterBank* regBank) : regBank_(regBank) {}
+
+        ~SimulationSnapshotExchangeImpl() override = default;
+
+        ClientInputSnapshot readClientInputSnapshot() override {
+            return regBank_->RegBankSendInfo();
+        };
+
+        void publishModelOutputSnapshot(const ModelOutputSnapshot& snapshot) override {
+            regBank_->RegBankTakeInfo(snapshot);
+        };
+    private:
+        RegisterBank* regBank_;
+    };
 }
 #endif // REGISTERBANK_HPP

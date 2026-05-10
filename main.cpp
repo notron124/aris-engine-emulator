@@ -23,17 +23,17 @@ int main(int argc, char *argv[])
 
     // 3. Настройка моста
     /// @todo Нужно реализовать SimulationSnapshotExchange
-    // auto exchange = SimulationSnapshotExchange(registerBank);
-    // emulator::simulation::SimulationBackendBridge bridge(
-    //     exchange,
-    //     controller,
-    //     &a);
+    auto exchange = emulator::registerbank::SimulationSnapshotExchangeImpl(&registerBank);
+    emulator::simulation::SimulationBackendBridge bridge(
+        exchange,
+        controller,
+        &a);
 
-    // QObject::connect(
-    //     &registerBank,
-    //     &RegisterBank::sig_inputSnapshotUpdated,
-    //     &bridge,
-    //     &SimulationBackendBridge::slot_processRequest);
+    QObject::connect(
+         &registerBank,
+         &emulator::registerbank::RegisterBank::sig_inputSnapshotUpdated,
+         &bridge,
+         &emulator::simulation::SimulationBackendBridge::slot_processRequest);
 
     if (!server.start("127.0.0.1", 1502)) {
         return 1;

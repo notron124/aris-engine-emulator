@@ -6,10 +6,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(register-bank
-  # src/ModbusServer.cpp
   src/RegisterBank.cpp
   include/RegisterBank.hpp
-  # src/ModbusTcpServer.hpp
 )
 
 target_include_directories(register-bank
@@ -21,7 +19,9 @@ target_include_directories(register-bank
 
 target_link_libraries(register-bank
   PUBLIC
+
     Emulator::Simulation::Contracts
+    Emulator::Simulation::Exchange
 )
 
 if(BUILD_TESTS)

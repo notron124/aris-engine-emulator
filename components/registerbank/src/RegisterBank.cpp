@@ -95,7 +95,8 @@ namespace emulator::registerbank {
 		if (addr >= numberOfCoils) {
 			return false;
 		}
-		coils_[addr] = value;
+        coils_[addr] = value;
+        emit sig_inputSnapshotUpdated();
 		return true;
 	}
 
@@ -106,6 +107,7 @@ namespace emulator::registerbank {
 		for (uint16_t i = startAddr; i < startAddr + values.size(); i++) {
 			coils_[i] = values[i - startAddr];
 		}
+        emit sig_inputSnapshotUpdated();
 		return true;
 	}
 
@@ -114,6 +116,7 @@ namespace emulator::registerbank {
 			return false;
 		}
 		holdingRegisters_[addr] = value;
+        emit sig_inputSnapshotUpdated();
 		return true;
 	}
 
@@ -124,6 +127,7 @@ namespace emulator::registerbank {
 		for (uint16_t i = startAddr; i < startAddr + values.size(); i++) {
 			holdingRegisters_[i] = values[i - startAddr];
 		}
+        emit sig_inputSnapshotUpdated();
 		return true;
 	}
 
