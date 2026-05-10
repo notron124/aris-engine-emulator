@@ -277,7 +277,7 @@ emulator::exchange::ModelOutputSnapshot makeModelOutputSnapshot(
     snapshot.sourceInputRevision = sourceInputRevision;
     snapshot.timestampUtc = QDateTime::fromMSecsSinceEpoch(
         1712345678000,
-        QTimeZone::UTC);
+        QTimeZone(QByteArrayLiteral("UTC")));
     snapshot.state = SimulationState::Running;
     snapshot.outputs = makeModelOutputs();
     snapshot.modelTime = std::chrono::milliseconds{1250};
