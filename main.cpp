@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
     //     &bridge,
     //     &SimulationBackendBridge::slot_processRequest);
 
-    if (!server.start("127.0.0.1", 502)) {
+    if (!server.start("127.0.0.1", 1502)) {
         return 1;
     }
 
