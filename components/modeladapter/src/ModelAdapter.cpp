@@ -132,6 +132,12 @@ bool ModelBase::setInputs(const ModelInputs& inputs) {
     // Сохраняем целевые значения от пользователя
     pimpl->target_rpm = inputs.target_rpm;               // об/мин
     pimpl->target_torque_nm = inputs.target_torque_nm;   // Н·м
+    if (pimpl->target_torque_nm == 0.0) {
+        pimpl->target_torque_nm = inputs.target_brake_torque_nm;
+    }
+    if (pimpl->target_torque_nm == 0.0) {
+        pimpl->target_torque_nm = inputs.M_AD_target;
+    }
     
     // Обновляем аварийные пределы (могут меняться через SCADA)
     pimpl->t_cool_max = inputs.limits.T_cool_max;
@@ -225,6 +231,14 @@ ModelOutputs ModelBase::readOutputs() const {
     out.t_ballast_c = pimpl->ballast->get_temperature();
     out.p_oil_bar = pimpl->ice->get_oil_pressure();
     out.m_ad_nm = pimpl->motor->get_moment();
+
+    out.omega_ICE_prir = out.ice_rpm;
+    out.omega_ICE_run = out.ice_rpm;
+    out.T_cool = out.t_cool_c;
+    out.T_AD = out.t_ad_c;
+    out.T_ballast = out.t_ballast_c;
+    out.P_oil = out.p_oil_bar;
+    out.M_AD = out.m_ad_nm;
     
     return out;
 }
