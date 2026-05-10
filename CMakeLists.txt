@@ -20,6 +20,7 @@ add_subdirectory(components/modbus)
 add_subdirectory(components/registerbank)
 add_subdirectory(components/simulation)
 add_subdirectory(components/simple-models)
+add_subdirectory(components/complex-model)
 add_subdirectory(components/modeladapter)
 
 add_executable(aris-engine
