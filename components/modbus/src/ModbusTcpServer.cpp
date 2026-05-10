@@ -65,6 +65,8 @@ bool ModbusTcpServer::readData(QModbusDataUnit* data) const {
         return false;
     }
 
+    registerBank_->writeComplete();
+
     return QModbusTcpServer::readData(data);
 }
 
@@ -98,6 +100,8 @@ bool ModbusTcpServer::writeData(const QModbusDataUnit& data) {
     default:
         return false;
     }
+
+
 
     return QModbusTcpServer::writeData(data);
 }

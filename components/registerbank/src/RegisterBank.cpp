@@ -8,28 +8,31 @@ namespace emulator::registerbank {
 		ModelInputs registerBankStoredInputs;
         Limits limits;
 
-		limits.T_cool_max = holdingRegToDouble(T_cool_max);
-		limits.P_oil_min = holdingRegToDouble(P_oil_min);
-		limits.P_oil_max = holdingRegToDouble(P_oil_max);
-		limits.omega_ICE_max_prir = holdingRegToDouble(omega_ICE_max_prir);
-		limits.omega_ICE_max_run = holdingRegToDouble(omega_ICE_max_run);
-		limits.T_AD_max = holdingRegToDouble(T_AD_max);
-		limits.T_ballast_max = holdingRegToDouble(T_ballast_max);
+        limits.T_ballast_max = holdingRegToDouble(T_ballast_max);
+        limits.P_oil_max = holdingRegToDouble(P_oil_max);
+        limits.P_oil_min = holdingRegToDouble(P_oil_min);
+        limits.T_AD_max = holdingRegToDouble(T_AD_max);
+        limits.T_cool_max = holdingRegToDouble(T_cool_max);
+        limits.omega_ICE_max_prir = holdingRegToDouble(omega_ICE_max_prir);
+        limits.omega_ICE_max_run = holdingRegToDouble(omega_ICE_max_run);
+        limits.rpm_max_lapping = holdingRegToDouble(rpm_max_lapping);
+        limits.rpm_max_run = holdingRegToDouble(rpm_max_run);
 
-		registerBankStoredInputs.limits = limits;
+        registerBankStoredInputs.limits = limits;
+
 
 		registerBankStoredInputs.f_AD = holdingRegToDouble(f_AD_Input);
 		registerBankStoredInputs.M_AD_target = holdingRegToDouble(M_AD_target);
-
 		registerBankStoredInputs.fan_ICE_enabled = coils_[fan_ICE];
 		registerBankStoredInputs.fan_AD_enabled = coils_[fan_AD];
 		registerBankStoredInputs.fan_ballast_enabled = coils_[fan_ballast];
+        registerBankStoredInputs.mode = holdingRegToMode(simulationMode);
+        registerBankStoredInputs.target_brake_torque_nm = holdingRegToDouble(target_brake_torque_nm);
+        registerBankStoredInputs.throttle_position = holdingRegToDouble(throttle_position);
 
 		clientSnapshot.revision = holdingRegToInt(revision_h);
 		clientSnapshot.command = holdingRegToCommand(simulationCommand);
 		clientSnapshot.request = holdingRegToRequest(simulationRequest);
-		registerBankStoredInputs.mode = holdingRegToMode(simulationMode);
-
 		clientSnapshot.inputs = registerBankStoredInputs;
 
 		return clientSnapshot;
@@ -96,7 +99,6 @@ namespace emulator::registerbank {
 			return false;
 		}
         coils_[addr] = value;
-        emit sig_inputSnapshotUpdated();
 		return true;
 	}
 
@@ -107,7 +109,6 @@ namespace emulator::registerbank {
 		for (uint16_t i = startAddr; i < startAddr + values.size(); i++) {
 			coils_[i] = values[i - startAddr];
 		}
-        emit sig_inputSnapshotUpdated();
 		return true;
 	}
 
@@ -116,7 +117,6 @@ namespace emulator::registerbank {
 			return false;
 		}
 		holdingRegisters_[addr] = value;
-        emit sig_inputSnapshotUpdated();
 		return true;
 	}
 
@@ -127,9 +127,12 @@ namespace emulator::registerbank {
 		for (uint16_t i = startAddr; i < startAddr + values.size(); i++) {
 			holdingRegisters_[i] = values[i - startAddr];
 		}
-        emit sig_inputSnapshotUpdated();
 		return true;
-	}
+    }
+
+    void RegisterBank::writeComplete() {
+        emit sig_inputSnapshotUpdated();
+    }
 
 	bool RegisterBank::doubleToInputReg(uint16_t offset, double data) {
 		memcpy(&inputRegisters_[offset], &data, sizeof(double));

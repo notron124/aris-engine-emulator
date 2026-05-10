@@ -27,7 +27,7 @@ namespace emulator::registerbank {
     class RegisterBank : public QObject {
         Q_OBJECT
     public:
-        RegisterBank() {
+        RegisterBank(QObject* parent = nullptr) : QObject(parent) {
             coils_.resize(numberOfCoils);
             coils_.fill(false);
             discreteInputs_.resize(numberOfDiscreteInputs);
@@ -38,7 +38,7 @@ namespace emulator::registerbank {
             holdingRegisters_.fill(0);
         }
 
-        ~RegisterBank() = default;
+        ~RegisterBank() override = default;
 
         ClientInputSnapshot RegBankSendInfo();
         bool RegBankTakeInfo(const ModelOutputSnapshot& InputData);
@@ -52,6 +52,7 @@ namespace emulator::registerbank {
         bool writeCoils(uint16_t startAddr, const QList<bool>& values);
         bool writeHoldingRegister(uint16_t addr, uint16_t value);
         bool writeHoldingRegisters(uint16_t startAddr, const QList<uint16_t>& values);
+        void writeComplete();
 
         // InputRegisters offset
         static constexpr uint16_t T_cool = 0;
@@ -75,14 +76,18 @@ namespace emulator::registerbank {
         static constexpr uint16_t P_oil_max = 8;
         static constexpr uint16_t omega_ICE_max_prir = 12;
         static constexpr uint16_t omega_ICE_max_run = 16;
-        static constexpr uint16_t T_AD_max = 20;
-        static constexpr uint16_t T_ballast_max = 24;
-        static constexpr uint16_t f_AD_Input = 28;    
-        static constexpr uint16_t M_AD_target = 32;
-        static constexpr uint16_t revision_h = 36;
-        static constexpr uint16_t simulationCommand = 40;
-        static constexpr uint16_t simulationRequest = 41;
-        static constexpr uint16_t simulationMode = 42;
+        static constexpr uint16_t rpm_max_lapping = 20;
+        static constexpr uint16_t rpm_max_run = 24;
+        static constexpr uint16_t target_brake_torque_nm = 28;
+        static constexpr uint16_t throttle_position = 32;
+        static constexpr uint16_t T_AD_max = 36;
+        static constexpr uint16_t T_ballast_max = 40;
+        static constexpr uint16_t f_AD_Input = 44;
+        static constexpr uint16_t M_AD_target = 48;
+        static constexpr uint16_t revision_h = 52;
+        static constexpr uint16_t simulationCommand = 56;
+        static constexpr uint16_t simulationRequest = 57;
+        static constexpr uint16_t simulationMode = 58;
 
         // Coils offset
         static constexpr uint16_t fan_ICE = 0;
