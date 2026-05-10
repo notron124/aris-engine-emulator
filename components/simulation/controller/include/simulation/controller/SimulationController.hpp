@@ -43,7 +43,7 @@ public:
      */
     explicit SimulationController(
         model::ModelAdapter& modelAdapter,
-        SimulationConfig config = continuous50Config,
+        SimulationConfig config = continuous5Config,
         QObject* parent = nullptr);
 
     /**
