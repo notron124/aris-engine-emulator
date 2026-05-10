@@ -99,6 +99,8 @@ bool ModbusTcpServer::writeData(const QModbusDataUnit& data) {
         return false;
     }
 
+    emit registerBank_->sig_inputSnapshotUpdated();
+
     return QModbusTcpServer::writeData(data);
 }
 
