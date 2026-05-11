@@ -1,0 +1,49 @@
+% General
+Ts = 0.001;
+fan_min_factor = 0.4;
+fan_max_factor = 1;
+fan_abs_delta = abs(fan_max_factor - fan_min_factor);
+T_amb = 25.0;
+tau	= 40.0;
+poles = 2;
+
+% ICE
+J_ICE = 3.5;
+k_heat = 0.30;
+k_radiator = 450.0;
+tau_cool = 40.0;
+ICE_fun_acceleration = 5;
+ICE_fun_deceleration = 5;
+M_peak = 3500.0;
+
+% AD
+J_AD = 1.2;
+k_loss = 0.025;
+k_loss0 = 800.0;
+k_rad_AD = 150.0;
+M_AD_nom = 3500.0;
+a_const = 1.0;
+ad_fun_acceleration = 5;
+ad_fun_deceleration = 5;
+s_max = 0.05;
+tau_AD_base = 900.0;
+
+M_max_factor = 2.2;
+
+% ballast resistor
+k_rad_ballast = 100.0;
+P_ballast_nom = 400000.0;
+tau_ballast	= 600.0;
+b_const = 1.0;
+ballast_fun_acceleration = 5;
+ballast_fun_deceleration = 5;
+
+% Из тестов
+J_AD = 1.0;
+k_loss = 0.2;
+k_loss0 = 10.0;
+k_rad_AD = 100.0;
+tau_AD_base = 15.0;
+T_amb = 20.0;
+M_AD_nom = 1000.0;
+a_const = 0.8;
