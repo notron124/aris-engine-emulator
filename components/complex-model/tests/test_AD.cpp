@@ -1,7 +1,7 @@
-#include "total_system.h"
+#include "../include/total_system.h"
 
-#include <QtTest/QTest>
 #include <cmath>
+#include <QtTest/QTest>
 
 constexpr double Ts  = 0.001;
 

@@ -1,6 +1,5 @@
 file(GLOB MODEL_SOURCES
         "src/*.cpp"
-        "src/*.c"
 )
 
 add_library(complex-model

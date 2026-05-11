@@ -3,9 +3,9 @@
 //
 // Code generated for Simulink model 'AsyncMotor'.
 //
-// Model version                  : 1.276
+// Model version                  : 1.349
 // Simulink Coder version         : 25.2 (R2025b) 28-Jul-2025
-// C/C++ source code generated on : Fri May  8 02:26:45 2026
+// C/C++ source code generated on : Mon May 11 16:22:31 2026
 //
 #ifndef rtGetInf_h_
 #define rtGetInf_h_

@@ -5,7 +5,7 @@
 //
 // Model version                  : 1.349
 // Simulink Coder version         : 25.2 (R2025b) 28-Jul-2025
-// C/C++ source code generated on : Mon May 11 04:07:43 2026
+// C/C++ source code generated on : Mon May 11 16:22:31 2026
 //
 // Target selection: ert.tlc
 // Embedded hardware selection: Intel->x86-64 (Linux 64)
@@ -20,7 +20,14 @@
 #include "rtw_solver.h"
 #include "rt_nonfinite.h"
 #include "AsyncMotor_types.h"
+
+extern "C"
+{
+
 #include "rtGetInf.h"
+
+}
+
 #include "model_reference_types.h"
 #include <cstring>
 

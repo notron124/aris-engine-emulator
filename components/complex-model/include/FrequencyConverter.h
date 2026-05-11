@@ -3,9 +3,9 @@
 //
 // Code generated for Simulink model 'FrequencyConverter'.
 //
-// Model version                  : 1.267
+// Model version                  : 1.285
 // Simulink Coder version         : 25.2 (R2025b) 28-Jul-2025
-// C/C++ source code generated on : Mon May 11 04:13:52 2026
+// C/C++ source code generated on : Mon May 11 19:29:22 2026
 //
 // Target selection: ert.tlc
 // Embedded hardware selection: Intel->x86-64 (Linux 64)
@@ -24,15 +24,14 @@
 // Block states (default storage) for model 'FrequencyConverter'
 struct FrequencyConverter_DW_f {
   real_T ballast_power;                // '<S1>/Data Store Memory'
-  real_T omega_sync;                   // '<S6>/Data Store Memory'
-  real_T omega_sync_c;                 // '<Root>/Data Store Memory'
+  real_T omega_sync;                   // '<Root>/Data Store Memory'
 };
 
 // Invariant block signals for model 'FrequencyConverter'
 struct FrequencyConverter_ConstB_h {
   real_T Product;                      // '<S2>/Product'
   real_T Gain;                         // '<S3>/Gain'
-  real_T Square;                       // '<S8>/Square'
+  real_T Square;                       // '<S6>/Square'
 };
 
 // Real-time Model Data Structure
@@ -54,19 +53,9 @@ extern void FrequencyConverter_initialize(const char_T **rt_errorStatus,
   FrequencyConverter_RT_MODEL *const FrequencyConverterrtM,
   FrequencyConverter_DW_f *localDW);
 extern void FrequencyConverter(const real_T *rtu_target_torque, const real_T
-  *rtu_M_AD, const real_T *rtu_n_rpm_rotor, real_T *rty_ballast_power, real_T
-  *rty_omega_sync, real_T *rty_torque, FrequencyConverter_DW_f *localDW);
-
-//-
-//  These blocks were eliminated from the model due to optimizations:
-//
-//  Block '<S5>/Constant' : Unused code path elimination
-//  Block '<S5>/Max' : Unused code path elimination
-//  Block '<S5>/Minus' : Unused code path elimination
-//  Block '<S5>/Product' : Unused code path elimination
-//  Block '<S5>/Product1' : Unused code path elimination
-//  Block '<S5>/Zero' : Unused code path elimination
-
+  *rtu_M_AD, const real_T *rtu_n_rpm_rotor, const real_T *rtu_set_omega_sync,
+  real_T *rty_ballast_power, real_T *rty_omega_sync, real_T *rty_torque,
+  FrequencyConverter_DW_f *localDW);
 
 //-
 //  The generated code includes comments that allow you to trace directly
@@ -89,8 +78,6 @@ extern void FrequencyConverter(const real_T *rtu_target_torque, const real_T
 //  '<S4>'   : 'FrequencyConverter/calc_ballast_power/If Action Subsystem'
 //  '<S5>'   : 'FrequencyConverter/calc_ballast_power/If Action Subsystem1'
 //  '<S6>'   : 'FrequencyConverter/set_target_torque/Subsystem'
-//  '<S7>'   : 'FrequencyConverter/set_target_torque/Subsystem/If Action Subsystem'
-//  '<S8>'   : 'FrequencyConverter/set_target_torque/Subsystem/If Action Subsystem1'
 
 #endif                                 // FrequencyConverter_h_
 

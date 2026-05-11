@@ -3,9 +3,9 @@
 //
 // Code generated for Simulink model 'total_system'.
 //
-// Model version                  : 1.247
+// Model version                  : 1.257
 // Simulink Coder version         : 25.2 (R2025b) 28-Jul-2025
-// C/C++ source code generated on : Mon May 11 04:27:18 2026
+// C/C++ source code generated on : Mon May 11 19:17:10 2026
 //
 // Target selection: ert.tlc
 // Embedded hardware selection: Intel->x86-64 (Linux 64)
@@ -33,7 +33,7 @@ namespace Model
     //   Inport: '<Root>/test_FC_M_AD'
     //   UnitDelay: '<Root>/Unit Delay1'
 
-    if (rtU.test_FC_M_AD > 0.0) {
+    if (rtU.test_FC_M_AD != 0.0) {
       rtb_Switch4 = rtU.test_FC_M_AD;
     } else {
       rtb_Switch4 = rtDW.UnitDelay1_DSTATE;
@@ -45,7 +45,7 @@ namespace Model
     //   Inport: '<Root>/test_FC_n_rpm_rotor'
     //   UnitDelay: '<Root>/Unit Delay'
 
-    if (rtU.test_FC_n_rpm_rotor > 0.0) {
+    if (rtU.test_FC_n_rpm_rotor != 0.0) {
       rtb_Switch3 = rtU.test_FC_n_rpm_rotor;
     } else {
       rtb_Switch3 = rtDW.UnitDelay_DSTATE;
@@ -55,13 +55,15 @@ namespace Model
 
     // ModelReference: '<Root>/Model' incorporates:
     //   Inport: '<Root>/M_AD_target'
+    //   Inport: '<Root>/test_FC_set_omega_sync'
     //   Outport: '<Root>/FC_omega_sync'
     //   Outport: '<Root>/ballast_power'
     //   Outport: '<Root>/target_torque'
 
     FrequencyConverter(&rtU.M_AD_target, &rtb_Switch4, &rtb_Switch3,
-                       &rtY.ballast_power, &rtY.FC_omega_sync,
-                       &rtY.target_torque, &(rtDW.Model_InstanceData.rtdw));
+                       &rtU.test_FC_set_omega_sync, &rtY.ballast_power,
+                       &rtY.FC_omega_sync, &rtY.target_torque,
+                       &(rtDW.Model_InstanceData.rtdw));
 
     // Switch: '<Root>/Switch' incorporates:
     //   Inport: '<Root>/test_AD_omega_sync'
