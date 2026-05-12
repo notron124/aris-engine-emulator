@@ -5,6 +5,7 @@
 - [Технические требования](docs/intro/ТТ%20общие.md)
 - [Техническое задание](docs/intro/ТЗ%20на%20мат.%20модель%20стенда.md)
 - [Архитектура](docs/architecture/architecture.md)
+- [Отчет](docs/report/project-report.md)
 
 ## ⚙️ Сборка и запуск тестов
 
