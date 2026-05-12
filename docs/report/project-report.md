@@ -1,6 +1,6 @@
 # Отчет о текущем состоянии проекта `aris-engine-emulator`
 
-[Видео отчет](report.mp4)
+<video src="report.mp4" controls>Видео отчет</video>
 
 ## 1. Назначение проекта
 
