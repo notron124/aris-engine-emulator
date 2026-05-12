@@ -14,7 +14,6 @@ int main(int argc, char *argv[])
     emulator::modbus::ModbusServer server(&registerBank, &a);
 
     // 2. Настройка контроллера
-    /// @todo Конкретную модель передать
     auto model = emulator::model::ModelBase();
     emulator::simulation::SimulationController controller(
         model,
@@ -22,7 +21,6 @@ int main(int argc, char *argv[])
         &a);
 
     // 3. Настройка моста
-    /// @todo Нужно реализовать SimulationSnapshotExchange
     auto exchange = emulator::registerbank::SimulationSnapshotExchangeImpl(&registerBank);
     emulator::simulation::SimulationBackendBridge bridge(
         exchange,
